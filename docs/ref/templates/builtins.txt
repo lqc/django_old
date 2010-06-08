@@ -1040,6 +1040,12 @@ For example::
 The populated variable (in the example above, ``total``) is only available
 between the ``{% with %}`` and ``{% endwith %}`` tags.
 
+Multiple variables can be cached by using the word ``"and"`` as a delimiter::
+
+    {% with items.0 as first and items|slice:"1:" as rest %}
+        {{ first }} comes first and {{ rest|join:", " }} follow.
+    {% endwith %}
+
 .. _ref-templates-builtins-filters:
 
 Built-in filter reference

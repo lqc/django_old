@@ -1212,9 +1212,14 @@ class Templates(unittest.TestCase):
             ### WITH TAG ########################################################
             'with01': ('{% with dict.key as key %}{{ key }}{% endwith %}', {'dict': {'key':50}}, '50'),
             'with02': ('{{ key }}{% with dict.key as key %}{{ key }}-{{ dict.key }}-{{ key }}{% endwith %}{{ key }}', {'dict': {'key':50}}, ('50-50-50', 'INVALID50-50-50INVALID')),
+            'with03': ('{% with dict.k1 as k1 and dict.k2 as k2 %}{{ k1 }}+{{ k2 }}{% endwith %}', {'dict': {'k1':3, 'k2':4}}, '3+4'),
+            'with04': ('{% with 42 as z and x|add:5 as y and y as x %}({{ x }},{{ y }},{{ z }}){% endwith %}', {'x': 13, 'y': -5}, '(-5,18,42)'),
 
             'with-error01': ('{% with dict.key xx key %}{{ key }}{% endwith %}', {'dict': {'key':50}}, template.TemplateSyntaxError),
             'with-error02': ('{% with dict.key as %}{{ key }}{% endwith %}', {'dict': {'key':50}}, template.TemplateSyntaxError),
+            'with-error03': ('{% with dict.k1 as k1 and dict.k2 %}{{ key }}{% endwith %}', {'dict': {'k1':3, 'k2':4}}, template.TemplateSyntaxError),
+            'with-error04': ('{% with dict.k1 equals k1 %}{{ key }}{% endwith %}', {'dict': {'k1':3, 'k2':4}}, template.TemplateSyntaxError),
+            'with-error05': ('{% with dict.k1 as k1, dict.k2 as k2 %}{{ key }}{% endwith %}', {'dict': {'k1':3, 'k2':4}}, template.TemplateSyntaxError),
 
             ### NOW TAG ########################################################
             # Simple case

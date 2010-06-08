@@ -417,18 +417,19 @@ class WidthRatioNode(Node):
         return str(int(round(ratio)))
 
 class WithNode(Node):
-    def __init__(self, var, name, nodelist):
-        self.var = var
-        self.name = name
+    def __init__(self, names, vars, nodelist):
+        self.names = names
+        self.vars = vars
         self.nodelist = nodelist
 
     def __repr__(self):
         return "<WithNode>"
 
     def render(self, context):
-        val = self.var.resolve(context)
+        values = [var.resolve(context) for var in self.vars]
         context.push()
-        context[self.name] = val
+        for name, value in zip(self.names, values):
+            context[name] = value
         output = self.nodelist.render(context)
         context.pop()
         return output
@@ -1198,21 +1199,36 @@ widthratio = register.tag(widthratio)
 def do_with(parser, token):
     """
     Adds a value to the context (inside of this block) for caching and easy
-    access.
+    access. You can bind a value to a new name using ``as``. You can chain
+    multiple bindings with ``and``. You can also safely swap variables.
 
     For example::
 
         {% with person.some_sql_method as total %}
             {{ total }} object{{ total|pluralize }}
         {% endwith %}
+
+        {% with x|add:5 as y and y as x %}
+            ({{ x }}, {{ y }})
+        {% endwith %}
     """
     bits = list(token.split_contents())
-    if len(bits) != 4 or bits[2] != "as":
-        raise TemplateSyntaxError("%r expected format is 'value as name'" %
-                                  bits[0])
-    var = parser.compile_filter(bits[1])
-    name = bits[3]
+    try:
+        if len(bits) % 4:
+            raise TemplateSyntaxError()
+        for b in bits[2::4]:
+            if b != 'as':
+                raise TemplateSyntaxError()
+        for b in bits[4::4]:
+            if b != 'and':
+                raise TemplateSyntaxError()
+    except TemplateSyntaxError:
+        raise TemplateSyntaxError("'%s' statements should use the format "
+                                  "'with value as name [and value as name]...'"
+                                  ": %s" % (bits[0], token.contents))
+    varlist = [parser.compile_filter(b) for b in bits[1::4]]
+    namelist = bits[3::4]
     nodelist = parser.parse(('endwith',))
     parser.delete_first_token()
-    return WithNode(var, name, nodelist)
+    return WithNode(namelist, varlist, nodelist)
 do_with = register.tag('with', do_with)
