@@ -923,6 +923,17 @@ class Templates(unittest.TestCase):
             'include 05': ('template with a space', {}, 'template with a space'),
             'include06': ('{% include "include 05"%}', {}, 'template with a space'),
 
+            # extra inline context
+            'include07': ('{% include "basic-syntax02" with headline="Inline" %}', {'headline': 'Included'}, 'Inline'),
+            'include08': ('{% include headline with headline="Dynamic" %}', {'headline': 'basic-syntax02'}, 'Dynamic'),
+            'include09': ('{{ first }}--{% include "basic-syntax03" with first=second|lower|upper second=first|upper %}--{{ second }}', {'first': 'Ul', 'second': 'lU'}, 'Ul--LU --- UL--lU'),
+
+            'include-error01': ('{% include "basic-syntax01" with %}', {}, template.TemplateSyntaxError),
+            'include-error02': ('{% include "basic-syntax01" with "no key" %}', {}, template.TemplateSyntaxError),
+            'include-error03': ('{% include "basic-syntax01" with dotted.arg="error" %}', {}, template.TemplateSyntaxError),
+            'include-error04': ('{% include "basic-syntax01" something_random %}', {}, template.TemplateSyntaxError),
+            'include-error05': ('{% include "basic-syntax01" foo="duplicate" foo="key" %}', {}, template.TemplateSyntaxError),
+
             ### NAMED ENDBLOCKS #######################################################
 
             # Basic test
