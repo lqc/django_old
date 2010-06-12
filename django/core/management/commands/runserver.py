@@ -7,6 +7,8 @@ from django.core.management.base import BaseCommand, CommandError
 
 class Command(BaseCommand):
     option_list = BaseCommand.option_list + (
+        make_option('--ipv6', '-6', action='store_true', dest='enable_ipv6', default=False,
+            help='Enables IPv6 support.'),
         make_option('--noreload', action='store_false', dest='use_reloader', default=True,
             help='Tells Django to NOT use the auto-reloader.'),
         make_option('--nostatic', action="store_false", dest='use_static_handler', default=True,
@@ -27,6 +29,12 @@ class Command(BaseCommand):
         from django.core.servers.basehttp import run, AdminMediaHandler, WSGIServerException
         from django.core.handlers.wsgi import WSGIHandler
         from django.contrib.staticfiles.handlers import StaticFilesHandler
+        enable_ipv6=options.get('enable_ipv6')
+        if enable_ipv6:
+                import socket
+                if not hasattr(socket, 'AF_INET6'):
+                        raise CommandError("This Python does not support IPv6.")
+
         if args:
             raise CommandError('Usage is runserver %s' % self.args)
         if not addrport:
@@ -34,11 +42,12 @@ class Command(BaseCommand):
             port = '8000'
         else:
             try:
-                addr, port = addrport.split(':')
+                addr, port = addrport.rsplit(':',1)
             except ValueError:
                 addr, port = '', addrport
         if not addr:
-            addr = '127.0.0.1'
+            if not enable_ipv6: addr = '127.0.0.1'
+            else: addr = '::1'
 
         if not port.isdigit():
             raise CommandError("%r is not a valid port number." % port)
@@ -73,7 +82,7 @@ class Command(BaseCommand):
                     handler = StaticFilesHandler(handler)
                 # serve admin media like old-school (deprecation pending)
                 handler = AdminMediaHandler(handler, admin_media_path)
-                run(addr, int(port), handler)
+                run(addr, int(port), handler, enable_ipv6=enable_ipv6)
             except WSGIServerException, e:
                 # Use helpful error messages instead of ugly tracebacks.
                 ERRORS = {

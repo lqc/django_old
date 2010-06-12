@@ -657,7 +657,7 @@ Just execute ``django-admin.py runserver`` more than once.
 Note that the default IP address, 127.0.0.1, is not accessible from other
 machines on your network. To make your development server viewable to other
 machines on the network, use its own IP address (e.g. ``192.168.2.1``) or
-``0.0.0.0``.
+``0.0.0.0`` or ``::`` (with IPv6 enabled).
 
 .. django-admin-option:: --adminmedia
 
@@ -706,6 +706,17 @@ Example usage::
 
     django-admin.py runserver --insecure
 
+--ipv6
+~~~~~~
+
+Use the ``--ipv6`` option to tell Django to enable IPv6 for the development
+server. This allows you to specify IPv6 addresses in colon-delimited form and
+changes the default IP address from 127.0.0.1 to ::1.
+
+Example usage::
+
+    django-admin.py runserver --ipv6
+
 Examples of using different ports and addresses
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -717,6 +728,10 @@ Port 8000 on IP address 1.2.3.4::
 
 	django-admin.py runserver 1.2.3.4:8000
 
+Port 8000 on IPv6 address 2001:0db8:1234:5678::9::
+
+	django-admin.py runserver --ipv6 2001:0db8:1234:5678::9:8000
+
 Port 7000 on IP address 127.0.0.1::
 
     django-admin.py runserver 7000
@@ -724,6 +739,10 @@ Port 7000 on IP address 127.0.0.1::
 Port 7000 on IP address 1.2.3.4::
 
     django-admin.py runserver 1.2.3.4:7000
+
+Port 7000 on IPv6 address 2001:0db8:1234:5678::9::
+
+    django-admin.py runserver --ipv6 2001:0db8:1234:5678::9:7000
 
 Serving static files with the development server
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
