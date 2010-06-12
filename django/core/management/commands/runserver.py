@@ -1,5 +1,6 @@
 from optparse import make_option
 import os
+import socket
 import sys
 import warnings
 
@@ -29,11 +30,9 @@ class Command(BaseCommand):
         from django.core.servers.basehttp import run, AdminMediaHandler, WSGIServerException
         from django.core.handlers.wsgi import WSGIHandler
         from django.contrib.staticfiles.handlers import StaticFilesHandler
-        enable_ipv6=options.get('enable_ipv6')
-        if enable_ipv6:
-                import socket
-                if not hasattr(socket, 'AF_INET6'):
-                        raise CommandError("This Python does not support IPv6.")
+        enable_ipv6 = options.get('enable_ipv6')
+        if enable_ipv6 and not hasattr(socket, 'AF_INET6'):
+            raise CommandError("This Python does not support IPv6.")
 
         if args:
             raise CommandError('Usage is runserver %s' % self.args)
@@ -42,12 +41,11 @@ class Command(BaseCommand):
             port = '8000'
         else:
             try:
-                addr, port = addrport.rsplit(':',1)
+                addr, port = addrport.rsplit(':', 1)
             except ValueError:
                 addr, port = '', addrport
         if not addr:
-            if not enable_ipv6: addr = '127.0.0.1'
-            else: addr = '::1'
+            addr = (enable_ipv6 and '::1') or '127.0.0.1'
 
         if not port.isdigit():
             raise CommandError("%r is not a valid port number." % port)
@@ -65,7 +63,8 @@ class Command(BaseCommand):
             print "Validating models..."
             self.validate(display_num_errors=True)
             print "\nDjango version %s, using settings %r" % (django.get_version(), settings.SETTINGS_MODULE)
-            print "Development server is running at http://%s:%s/" % (addr, port)
+            fmt_addr = (enable_ipv6 and '[%s]' % addr) or addr
+            print "Development server is running at http://%s:%s/" % (fmt_addr, port)
             print "Quit the server with %s." % quit_command
 
             # django.core.management.base forces the locale to en-us. We should

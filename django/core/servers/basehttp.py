@@ -10,6 +10,7 @@ been reviewed for security issues. Don't use it for production use.
 from BaseHTTPServer import BaseHTTPRequestHandler, HTTPServer
 import os
 import re
+import socket
 import sys
 import urllib
 import warnings
@@ -678,15 +679,12 @@ class AdminMediaHandler(StaticFilesHandler):
         """
         return path.startswith(self.media_url[2]) and not self.media_url[1]
 
+class WSGIServerV6(WSGIServer):
+    address_family = socket.AF_INET6
 
 def run(addr, port, wsgi_handler, enable_ipv6=False):
     server_address = (addr, port)
-    if not enable_ipv6:
-        httpd = WSGIServer(server_address, WSGIRequestHandler)
-    else:
-        import socket
-        class WSGIServerV6(WSGIServer):
-            address_family = socket.AF_INET6
-        httpd = WSGIServerV6(server_address, WSGIRequestHandler)
+    server_class = (enable_ipv6 and WSGIServerV6) or WSGIServer
+    httpd = server_class(server_address, WSGIRequestHandler)
     httpd.set_app(wsgi_handler)
     httpd.serve_forever()
