@@ -14,7 +14,9 @@ class SuspiciousOperation(Exception):
 
 class PermissionDenied(Exception):
     "The user did not have permission to do that"
-    pass
+    def __init__(self, message=None):
+        Exception.__init__(self)
+        self.message = message
 
 class ViewDoesNotExist(Exception):
     "The requested view does not exist"

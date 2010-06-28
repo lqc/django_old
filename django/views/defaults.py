@@ -1,6 +1,22 @@
 from django import http
 from django.template import Context, RequestContext, loader
 
+def permission_denied(request, template_name='403.html', reason=''):
+    """
+    Default 403 handler.
+
+    Templates: `403.html`
+    Context:
+        request_path
+            The path of the requested URL (e.g., '/app/pages/form_page')    
+    """
+    context = {
+        'request_path': request.path,
+        'reason': reason,
+    }
+    t = loader.get_template(template_name) # You need to create a 403.html template.
+    return http.HttpResponseForbidden(t.render(RequestContext(request, context)))
+
 def page_not_found(request, template_name='404.html'):
     """
     Default 404 handler.

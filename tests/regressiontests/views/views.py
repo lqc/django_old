@@ -10,6 +10,7 @@ from django.shortcuts import render_to_response
 from regressiontests.views import BrokenException, except_args
 
 from models import Article
+from django.core.exceptions import PermissionDenied
 
 
 def index_page(request):
@@ -57,3 +58,6 @@ def template_exception(request, n):
     return render_to_response('debug/template_exception.html',
         {'arg': except_args[int(n)]})
 
+def generate_permission_denied_with_reason(request):
+    """Dummy page to test Permission Denied exception with reason"""
+    raise PermissionDenied("Not allowed")

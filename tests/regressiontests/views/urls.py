@@ -40,6 +40,8 @@ urlpatterns = patterns('',
 
     # Default views
     (r'^shortcut/(\d+)/(.*)/$', 'django.views.defaults.shortcut'),
+    (r'^permission_denied_url/', 'django.views.defaults.permission_denied'),
+    (r'^permission_denied_with_reason/', views.generate_permission_denied_with_reason),
     (r'^non_existing_url/', 'django.views.defaults.page_not_found'),
     (r'^server_error/', 'django.views.defaults.server_error'),
 

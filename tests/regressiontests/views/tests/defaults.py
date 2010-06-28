@@ -47,6 +47,16 @@ class DefaultsTests(TestCase):
         response = self.client.get(short_url)
         self.assertEquals(response.status_code, 404)
 
+    def test_permission_denied(self):
+        "A 403 status is returned by the permission_denied view"
+        response = self.client.get('/views/permission_denied_url/')
+        self.assertEquals(response.status_code, 403)
+
+    def test_permission_denied_with_reason(self):
+        "A 403 status can propagate the reason for denying to the permission_denied view"
+        response = self.client.get('/views/permission_denied_with_reason/')
+        self.assertContains(response, "Not allowed", status_code=403)
+
     def test_page_not_found(self):
         "A 404 status is returned by the page_not_found view"
         non_existing_urls = ['/views/non_existing_url/', # this is in urls.py
@@ -56,7 +66,7 @@ class DefaultsTests(TestCase):
             self.assertEquals(response.status_code, 404)
 
     def test_server_error(self):
-        "The server_error view raises a 500 status"
+        "A 500 status is returned by the server_error view"
         response = self.client.get('/views/server_error/')
         self.assertEquals(response.status_code, 500)
 

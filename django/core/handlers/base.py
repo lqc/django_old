@@ -130,8 +130,10 @@ class BaseHandler(object):
                             return self.handle_uncaught_exception(request, resolver, sys.exc_info())
                         finally:
                             receivers = signals.got_request_exception.send(sender=self.__class__, request=request)
-            except exceptions.PermissionDenied:
-                return http.HttpResponseForbidden('<h1>Permission denied</h1>')
+            except exceptions.PermissionDenied, e:
+                callback, param_dict = resolver.resolve403()
+                param_dict['reason'] = e.message
+                return callback(request, **param_dict)
             except SystemExit:
                 # Allow sys.exit() to actually exit. See tickets #1023 and #4701
                 raise
