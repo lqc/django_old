@@ -1,5 +1,5 @@
 from django.contrib.auth.tests.auth_backends import BackendTest, RowlevelBackendTest, AnonymousUserBackendTest, NoAnonymousUserBackendTest
-from django.contrib.auth.tests.basic import BasicTestCase
+from django.contrib.auth.tests.basic import BasicTestCase, PasswordUtilsTestCase
 from django.contrib.auth.tests.decorators import LoginRequiredTestCase
 from django.contrib.auth.tests.forms import UserCreationFormTest, AuthenticationFormTest, SetPasswordFormTest, PasswordChangeFormTest, UserChangeFormTest, PasswordResetFormTest
 from django.contrib.auth.tests.remote_user \
