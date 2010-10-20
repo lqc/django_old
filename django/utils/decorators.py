@@ -38,6 +38,50 @@ def method_decorator(decorator):
     _dec.__name__ = 'method_decorator(%s)' % decorator.__name__
     return _dec
 
+def class_decorator(decorator):
+    """
+    Converts a function decorator into a class decorator suitable for Django's
+    class based views implementation::
+
+        @class_decorator(login_required):
+        class ProtectedView(View):
+            pass
+
+    """
+    def _dec(cls):
+        decorated = method_decorator(decorator)(cls.dispatch)
+        print decorated, cls.dispatch
+        cls.dispatch = decorated
+        return cls
+    update_wrapper(_dec, decorator)
+    # Change the name to aid debugging.
+    _dec.__name__ = 'class_decorator(%s)' % (decorator.__name__)
+    return _dec
+
+
+def view_decorator(fdec):
+    """
+    Change a function decorator into a view decorator.
+
+    This is a simplest approach possible. as_view() is overriden, so
+     that is applies the given decorator before returning.
+
+    In this approach, decorators are always put on top - that means it's not
+    possible to have functions called in this order:
+
+       B.dispatch, login_required, A.dispatch
+
+    """
+    from django.views.generic.base import classonlymethod
+    def decorator(cls):
+        newcls = type("Decorated%s" % cls.__name__, (cls,), {})
+        @classonlymethod
+        def as_view(subcls, **initkwargs):
+            return fdec(super(newcls, subcls).as_view(**initkwargs))
+        newcls.as_view = as_view
+        return newcls
+    return decorator
+
 
 def decorator_from_middleware_with_args(middleware_class):
     """
