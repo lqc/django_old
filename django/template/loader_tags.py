@@ -156,7 +156,7 @@ class ConstantIncludeNode(BaseIncludeNode):
 
 class IncludeNode(BaseIncludeNode):
     def __init__(self, template_name, extra_context={}):
-        self.template_name = Variable(template_name)
+        self.template_name = template_name
         self.extra_context = extra_context
 
     def render(self, context):
@@ -247,7 +247,7 @@ def do_include(parser, token):
     path = bits[1]
     if path[0] in ('"', "'") and path[-1] == path[0]:
         return ConstantIncludeNode(path[1:-1], extra_context=namemap)
-    return IncludeNode(bits[1], extra_context=namemap)
+    return IncludeNode(parser.compile_filter(bits[1]), extra_context=namemap)
 
 register.tag('block', do_block)
 register.tag('extends', do_extends)
