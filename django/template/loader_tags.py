@@ -1,6 +1,7 @@
 from django.template import TemplateSyntaxError, TemplateDoesNotExist, Variable
 from django.template import Library, Node, TextNode
 from django.template.loader import get_template
+from django.template.defaulttags import kwarg_re
 from django.conf import settings
 from django.utils.safestring import mark_safe
 
@@ -125,10 +126,11 @@ class ExtendsNode(Node):
         return compiled_parent._render(context)
 
 class ConstantIncludeNode(Node):
-    def __init__(self, template_path):
+    def __init__(self, template_path, extra_context={}):
         try:
             t = get_template(template_path)
             self.template = t
+            self.extra_context = extra_context
         except:
             if settings.TEMPLATE_DEBUG:
                 raise
@@ -136,20 +138,31 @@ class ConstantIncludeNode(Node):
 
     def render(self, context):
         if self.template:
-            return self.template.render(context)
+            values = [(name, var.resolve(context)) for name, var
+                        in self.extra_context.iteritems()]
+            context.update(dict(values))
+            output = self.template.render(context)
+            context.pop()
+            return output
         else:
             return ''
 
 class IncludeNode(Node):
-    def __init__(self, template_name):
+    def __init__(self, template_name, extra_context={}):
         self.template_name = Variable(template_name)
+        self.extra_context = extra_context
 
     def render(self, context):
         try:
             template_name = self.template_name.resolve(context)
             t = get_template(template_name)
-            return t.render(context)
-        except TemplateSyntaxError, e:
+            values = [(name, var.resolve(context)) for name, var
+                        in self.extra_context.iteritems()]
+            context.update(dict(values))
+            output = t.render(context)
+            context.pop()
+            return output
+        except TemplateSyntaxError:
             if settings.TEMPLATE_DEBUG:
                 raise
             return ''
@@ -201,19 +214,39 @@ def do_extends(parser, token):
 
 def do_include(parser, token):
     """
-    Loads a template and renders it with the current context.
+    Loads a template and renders it with the current context. You can pass
+    additional context using keyword arguments.
 
     Example::
 
         {% include "foo/some_include" %}
+        {% include "foo/some_include" with bar="BAZZ!" %}
+
     """
     bits = token.split_contents()
-    if len(bits) != 2:
-        raise TemplateSyntaxError("%r tag takes one argument: the name of the template to be included" % bits[0])
+    if len(bits) < 2:
+        raise TemplateSyntaxError("%r tag takes at least one argument: the name of the template to be included." % bits[0])
+    namemap = {}
+    if len(bits) > 2:
+        if bits[2] == 'with':
+            for bit in bits[3:]:
+                match = kwarg_re.match(bit)
+                if not match:
+                    raise TemplateSyntaxError("Malformed arguments to %r tag." % bits[0])
+                name, value = match.groups()
+                if not name:
+                    raise TemplateSyntaxError('''"with" part of %r tag accepts only keyword arguments.''' % bits[0])
+                if name in namemap:
+                    raise TemplateSyntaxError("Tried to bind value to name %r more than once." % name)
+                namemap[name] = parser.compile_filter(value)
+            if not namemap:
+                raise TemplateSyntaxError('''"with" in %r tag needs at least one keyword argument.''' % bits[0])
+        else:
+            raise TemplateSyntaxError('''Invalid option %r for %r tag.''' % (bits[2], bits[0]))
     path = bits[1]
     if path[0] in ('"', "'") and path[-1] == path[0]:
-        return ConstantIncludeNode(path[1:-1])
-    return IncludeNode(bits[1])
+        return ConstantIncludeNode(path[1:-1], extra_context=namemap)
+    return IncludeNode(bits[1], extra_context=namemap)
 
 register.tag('block', do_block)
 register.tag('extends', do_extends)
