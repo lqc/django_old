@@ -1,7 +1,7 @@
 from django.template import TemplateSyntaxError, TemplateDoesNotExist, Variable
 from django.template import Library, Node, TextNode
-from django.template.loader import get_template
 from django.template.defaulttags import kwarg_re
+from django.template.loader import get_template
 from django.conf import settings
 from django.utils.safestring import mark_safe
 
@@ -125,29 +125,36 @@ class ExtendsNode(Node):
         # the same.
         return compiled_parent._render(context)
 
-class ConstantIncludeNode(Node):
-    def __init__(self, template_path, extra_context={}):
+class BaseIncludeNode(Node):
+    def __init__(self, *args, **kwargs):
+        self.extra_context = kwargs.pop('extra_context', {})
+        super(BaseIncludeNode, self).__init__(*args, **kwargs)
+
+    def render_template(self, template, context):
+        values = [(name, var.resolve(context)) for name, var
+                  in self.extra_context.iteritems()]
+        context.update(dict(values))
+        output = template.render(context)
+        context.pop()
+        return output
+
+class ConstantIncludeNode(BaseIncludeNode):
+    def __init__(self, template_path, *args, **kwargs):
+        super(ConstantIncludeNode, self).__init__(*args, **kwargs)
         try:
             t = get_template(template_path)
             self.template = t
-            self.extra_context = extra_context
         except:
             if settings.TEMPLATE_DEBUG:
                 raise
             self.template = None
 
     def render(self, context):
-        if self.template:
-            values = [(name, var.resolve(context)) for name, var
-                        in self.extra_context.iteritems()]
-            context.update(dict(values))
-            output = self.template.render(context)
-            context.pop()
-            return output
-        else:
+        if not self.template:
             return ''
+        return self.render_template(self.template, context)
 
-class IncludeNode(Node):
+class IncludeNode(BaseIncludeNode):
     def __init__(self, template_name, extra_context={}):
         self.template_name = Variable(template_name)
         self.extra_context = extra_context
@@ -155,13 +162,8 @@ class IncludeNode(Node):
     def render(self, context):
         try:
             template_name = self.template_name.resolve(context)
-            t = get_template(template_name)
-            values = [(name, var.resolve(context)) for name, var
-                        in self.extra_context.iteritems()]
-            context.update(dict(values))
-            output = t.render(context)
-            context.pop()
-            return output
+            template = get_template(template_name)
+            return self.render_template(template, context)
         except TemplateSyntaxError:
             if settings.TEMPLATE_DEBUG:
                 raise
@@ -220,7 +222,7 @@ def do_include(parser, token):
     Example::
 
         {% include "foo/some_include" %}
-        {% include "foo/some_include" with bar="BAZZ!" %}
+        {% include "foo/some_include" with bar="BAZZ!" baz="BING!" %}
 
     """
     bits = token.split_contents()
@@ -228,21 +230,20 @@ def do_include(parser, token):
         raise TemplateSyntaxError("%r tag takes at least one argument: the name of the template to be included." % bits[0])
     namemap = {}
     if len(bits) > 2:
-        if bits[2] == 'with':
-            for bit in bits[3:]:
-                match = kwarg_re.match(bit)
-                if not match:
-                    raise TemplateSyntaxError("Malformed arguments to %r tag." % bits[0])
-                name, value = match.groups()
-                if not name:
-                    raise TemplateSyntaxError('''"with" part of %r tag accepts only keyword arguments.''' % bits[0])
-                if name in namemap:
-                    raise TemplateSyntaxError("Tried to bind value to name %r more than once." % name)
-                namemap[name] = parser.compile_filter(value)
-            if not namemap:
-                raise TemplateSyntaxError('''"with" in %r tag needs at least one keyword argument.''' % bits[0])
-        else:
+        if bits[2] != 'with':
             raise TemplateSyntaxError('''Invalid option %r for %r tag.''' % (bits[2], bits[0]))
+        for bit in bits[3:]:
+            match = kwarg_re.match(bit)
+            if not match:
+                raise TemplateSyntaxError("Malformed arguments to %r tag." % bits[0])
+            name, value = match.groups()
+            if not name:
+                raise TemplateSyntaxError('''"with" part of %r tag accepts only keyword arguments.''' % bits[0])
+            if name in namemap:
+                raise TemplateSyntaxError("Tried to bind value to name %r more than once." % name)
+            namemap[name] = parser.compile_filter(value)
+        if not namemap:
+            raise TemplateSyntaxError('''"with" in %r tag needs at least one keyword argument.''' % bits[0])
     path = bits[1]
     if path[0] in ('"', "'") and path[-1] == path[0]:
         return ConstantIncludeNode(path[1:-1], extra_context=namemap)
