@@ -1,4 +1,5 @@
 from django.conf.urls.defaults import *
+from django.contrib.auth.views import LoginView
 
 urlpatterns = patterns('',
     # test_client modeltest urls
@@ -9,7 +10,7 @@ urlpatterns = patterns('',
     (r'^file_uploads/', include('regressiontests.file_uploads.urls')),
 
     # Always provide the auth system login and logout views
-    (r'^accounts/login/$', 'django.contrib.auth.views.login', {'template_name': 'login.html'}),
+    (r'^accounts/login/$', LoginView.as_view(template_name='login.html')),
     (r'^accounts/logout/$', 'django.contrib.auth.views.logout'),
 
     # test urlconf for {% url %} template tag

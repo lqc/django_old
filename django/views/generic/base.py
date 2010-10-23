@@ -14,6 +14,11 @@ class classonlymethod(classmethod):
             raise AttributeError("This method is available only on the view class.")
         return super(classonlymethod, self).__get__(instance, owner)
 
+class GenericViewError(Exception):
+    """A problem in a generic view."""
+    pass
+
+
 class View(object):
     """
     Intentionally simple parent class for all views. Only implements

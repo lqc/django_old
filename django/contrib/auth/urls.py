@@ -4,8 +4,10 @@
 
 from django.conf.urls.defaults import *
 
+from django.contrib.auth.views import LoginView
+
 urlpatterns = patterns('',
-    (r'^login/$', 'django.contrib.auth.views.login'),
+    url(r'^login/$', LoginView.as_view(), name="auth_login"),
     (r'^logout/$', 'django.contrib.auth.views.logout'),
     (r'^password_change/$', 'django.contrib.auth.views.password_change'),
     (r'^password_change/done/$', 'django.contrib.auth.views.password_change_done'),

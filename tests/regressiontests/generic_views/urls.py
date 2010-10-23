@@ -1,8 +1,8 @@
 from django.conf.urls.defaults import *
 from django.views.generic import TemplateView
+from django.contrib.auth.views import LoginView
 
 import views
-
 
 urlpatterns = patterns('',
     # base
@@ -182,5 +182,5 @@ urlpatterns = patterns('',
         views.BookDetail.as_view()),
 
     # Useful for testing redirects
-    (r'^accounts/login/$',  'django.contrib.auth.views.login')
+    (r'^accounts/login/$',  LoginView.as_view())
 )

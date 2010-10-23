@@ -5,6 +5,7 @@ import urllib
 from django.conf import settings
 from django.contrib.auth import SESSION_KEY, REDIRECT_FIELD_NAME
 from django.contrib.auth.forms import AuthenticationForm
+from django.contrib.auth.views import redirect_to_login
 from django.contrib.sites.models import Site, RequestSite
 from django.contrib.auth.models import User
 from django.test import TestCase
@@ -186,7 +187,7 @@ class ChangePasswordTest(AuthViewsTestCase):
 class LoginTest(AuthViewsTestCase):
 
     def test_current_site_in_context_after_login(self):
-        response = self.client.get(reverse('django.contrib.auth.views.login'))
+        response = self.client.get(reverse('auth_login'))
         self.assertEquals(response.status_code, 200)
         site = Site.objects.get_current()
         self.assertEquals(response.context['site'], site)
@@ -195,7 +196,7 @@ class LoginTest(AuthViewsTestCase):
                      'Login form is not an AuthenticationForm')
 
     def test_security_check(self, password='password'):
-        login_url = reverse('django.contrib.auth.views.login')
+        login_url = reverse('auth_login')
 
         # Those URLs should not pass the security check
         for bad_url in ('http://example.com',
@@ -213,7 +214,7 @@ class LoginTest(AuthViewsTestCase):
                 'password': password,
                 }
             )
-            self.assertEquals(response.status_code, 302)
+            self.assertEquals(response.status_code, 302, response.content)
             self.assertFalse(bad_url in response['Location'], "%s should be blocked" % bad_url)
 
         # Now, these URLs have an other URL as a GET parameter and therefore
@@ -233,7 +234,7 @@ class LoginTest(AuthViewsTestCase):
             self.assertEquals(response.status_code, 302)
             self.assertTrue('/view/?param=%s' % url_ in response['Location'], "/view/?param=%s should be allowed" % url_)
 
-        
+
 class LogoutTest(AuthViewsTestCase):
     urls = 'django.contrib.auth.tests.urls'
 
@@ -276,4 +277,22 @@ class LogoutTest(AuthViewsTestCase):
         response = self.client.get('/logout/custom_query/?follow=/somewhere/')
         self.assertEqual(response.status_code, 302)
         self.assert_(response['Location'].endswith('/somewhere/'))
+        self.confirm_logged_out()
+
+
+class MiscTest(AuthViewsTestCase):
+    urls = 'django.contrib.auth.tests.urls'
+    
+    def confirm_logged_out(self):
+        self.assertTrue(SESSION_KEY not in self.client.session)
+
+    def test_redirect_to_login(self):
+        response = redirect_to_login("/newpath")
+        self.assertEqual(response.status_code, 302)
+        self.assertTrue(response['Location'].endswith('/login/?next=/newpath'), response["Location"])
+
+    def test_logout_then_login(self):
+        self.login()
+        response = self.client.get('/logout_then_login/')
+        self.assertRedirects(response, "/login/")
         self.confirm_logged_out()

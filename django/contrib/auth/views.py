@@ -18,50 +18,74 @@ from django.utils.translation import ugettext as _
 from django.contrib.auth.models import User
 from django.views.decorators.cache import never_cache
 
-@csrf_protect
-@never_cache
-def login(request, template_name='registration/login.html',
-          redirect_field_name=REDIRECT_FIELD_NAME,
-          authentication_form=AuthenticationForm):
+from django.utils.decorators import view_decorator
+from django.views.generic.base import TemplateResponseMixin
+from django.views.generic.edit import BaseFormView, FormMixin
+
+class SiteMixin(object):
+    
+    def get_current_site(self):
+        return get_current_site(self.request)
+    
+    def get_context_data(self, **kwargs):
+        data = super(SiteMixin, self).get_context_data(**kwargs)
+        current_site = self.get_current_site()
+        data.update({
+            "site": current_site,
+            "site_name": current_site.name,
+        })
+        return data
+
+
+
+@view_decorator(csrf_protect)
+@view_decorator(never_cache)
+class BaseLoginView(SiteMixin, BaseFormView):
+    redirect_field_name = REDIRECT_FIELD_NAME
+    form_class = AuthenticationForm
+
+    def get(self, request, *args, **kwargs):        
+        self.request.session.set_test_cookie()
+        return super(BaseLoginView, self).get(request, *args, **kwargs)
+    
+    def get_form_params(self, method):
+        args, kwargs = super(BaseLoginView, self).get_form_params(method)
+        if self.request.method != "POST":
+            kwargs["request"] = self.request
+        return args, kwargs
+
+    def get_context_data(self, **kwargs):
+        data = super(BaseLoginView, self).get_context_data(**kwargs)
+        data[self.redirect_field_name] = self.get_success_url()
+        return data
+
+    def form_valid(self, form):
+        auth_login(self.request, form.get_user())
+        if self.request.session.test_cookie_worked():
+                self.request.session.delete_test_cookie()
+        return super(BaseLoginView, self).form_valid(form)
+
+    def get_success_url(self):
+        redirect_to = self.request.REQUEST.get(self.redirect_field_name, '')
+        
+        # Light security check -- make sure redirect_to isn't garbage.
+        if not redirect_to or ' ' in redirect_to:
+            redirect_to = settings.LOGIN_REDIRECT_URL
+
+        # Heavier security check -- redirects to http://example.com should
+        # not be allowed, but things like /view/?param=http://example.com
+        # should be allowed. This regex checks if there is a '//' *before* a
+        # question mark.
+        elif '//' in redirect_to and re.match(r'[^\?]*//', redirect_to):
+            redirect_to = settings.LOGIN_REDIRECT_URL
+            
+        return redirect_to
+
+
+class LoginView(TemplateResponseMixin, BaseLoginView):
     """Displays the login form and handles the login action."""
+    template_name = 'registration/login.html'
 
-    redirect_to = request.REQUEST.get(redirect_field_name, '')
-
-    if request.method == "POST":
-        form = authentication_form(data=request.POST)
-        if form.is_valid():
-            # Light security check -- make sure redirect_to isn't garbage.
-            if not redirect_to or ' ' in redirect_to:
-                redirect_to = settings.LOGIN_REDIRECT_URL
-
-            # Heavier security check -- redirects to http://example.com should
-            # not be allowed, but things like /view/?param=http://example.com
-            # should be allowed. This regex checks if there is a '//' *before* a
-            # question mark.
-            elif '//' in redirect_to and re.match(r'[^\?]*//', redirect_to):
-                    redirect_to = settings.LOGIN_REDIRECT_URL
-
-            # Okay, security checks complete. Log the user in.
-            auth_login(request, form.get_user())
-
-            if request.session.test_cookie_worked():
-                request.session.delete_test_cookie()
-
-            return HttpResponseRedirect(redirect_to)
-
-    else:
-        form = authentication_form(request)
-
-    request.session.set_test_cookie()
-
-    current_site = get_current_site(request)
-
-    return render_to_response(template_name, {
-        'form': form,
-        redirect_field_name: redirect_to,
-        'site': current_site,
-        'site_name': current_site.name,
-    }, context_instance=RequestContext(request))
 
 def logout(request, next_page=None, template_name='registration/logged_out.html', redirect_field_name=REDIRECT_FIELD_NAME):
     "Logs out the user and displays 'You are logged out' message."

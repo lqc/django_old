@@ -1,6 +1,6 @@
 from django.conf.urls.defaults import patterns
 from django.contrib.auth.urls import urlpatterns
-from django.contrib.auth.views import password_reset
+from django.contrib.auth.views import password_reset, logout_then_login
 from django.contrib.auth.decorators import login_required
 from django.http import HttpResponse
 from django.template import Template, RequestContext
@@ -19,5 +19,6 @@ urlpatterns += patterns('',
     (r'^password_reset_from_email/$', 'django.contrib.auth.views.password_reset', dict(from_email='staffmember@example.com')),
     (r'^login_required/$', login_required(password_reset)),
     (r'^login_required_login_url/$', login_required(password_reset, login_url='/somewhere/')),
+    (r'^logout_then_login/$', logout_then_login, {"login_url": "/login/"})
 )
 

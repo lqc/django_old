@@ -73,12 +73,13 @@ def view_decorator(fdec):
 
     """
     from django.views.generic.base import classonlymethod
+    from copy import copy
     def decorator(cls):
-        newcls = type("Decorated%s" % cls.__name__, (cls,), {})
-        @classonlymethod
-        def as_view(subcls, **initkwargs):
-            return fdec(super(newcls, subcls).as_view(**initkwargs))
-        newcls.as_view = as_view
+        newcls = copy(cls)
+        newcls.__name__ += "With(%s)" % fdec.__name__
+        def as_view(current, **initkwargs):
+            return fdec(super(newcls, current).as_view(**initkwargs))
+        newcls.as_view = classonlymethod(as_view)
         return newcls
     return decorator
 

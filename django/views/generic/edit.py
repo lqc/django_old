@@ -1,7 +1,7 @@
 from django.forms import models as model_forms
 from django.core.exceptions import ImproperlyConfigured
 from django.http import HttpResponseRedirect
-from django.views.generic.base import TemplateResponseMixin, View
+from django.views.generic.base import TemplateResponseMixin, View, GenericViewError
 from django.views.generic.detail import (SingleObjectMixin,
                         SingleObjectTemplateResponseMixin, BaseDetailView)
 
@@ -26,21 +26,24 @@ class FormMixin(object):
         Returns the form class to use in this view
         """
         return self.form_class
+    
+    def get_form_params(self, http_method):
+        args, kwargs = [], {"initial": self.get_initial()}
+        if http_method in ('POST', 'PUT'):
+            kwargs["data"] = self.request.POST
+            kwargs["files"] = self.request.FILES            
+        return args, kwargs
 
     def get_form(self, form_class):
         """
         Returns an instance of the form to be used in this view.
         """
-        if self.request.method in ('POST', 'PUT'):
-            return form_class(
-                self.request.POST,
-                self.request.FILES,
-                initial=self.get_initial()
-            )
-        else:
-            return form_class(
-                initial=self.get_initial()
-            )
+        if form_class is None:
+            raise GenericViewError("get_form() in FormMixin expected a form class"
+            " as it first argument, but got None instead. You either forgot to"
+            " provide form_class attribute or broken get_form_class() somehow.")
+        args, kwargs = self.get_form_params(self.request.method)
+        return form_class(*args, **kwargs)
 
     def get_context_data(self, **kwargs):
         return kwargs
