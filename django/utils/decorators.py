@@ -50,7 +50,6 @@ def class_decorator(decorator):
     """
     def _dec(cls):
         decorated = method_decorator(decorator)(cls.dispatch)
-        print decorated, cls.dispatch
         cls.dispatch = decorated
         return cls
     update_wrapper(_dec, decorator)
@@ -73,14 +72,11 @@ def view_decorator(fdec):
 
     """
     from django.views.generic.base import classonlymethod
-    from copy import copy
     def decorator(cls):
-        newcls = copy(cls)
-        newcls.__name__ += "With(%s)" % fdec.__name__
         def as_view(current, **initkwargs):
-            return fdec(super(newcls, current).as_view(**initkwargs))
-        newcls.as_view = classonlymethod(as_view)
-        return newcls
+            return fdec(super(cls, current).as_view(**initkwargs))
+        cls.as_view = classonlymethod(as_view)
+        return cls
     return decorator
 
 

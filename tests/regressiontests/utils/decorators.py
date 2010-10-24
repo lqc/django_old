@@ -1,6 +1,7 @@
 from django.test import TestCase, RequestFactory
 from django.utils import unittest
 from django.utils.decorators import method_decorator, wraps, view_decorator
+from django.views.generic import View
 
 class DecoratorFromMiddlewareTests(TestCase):
     """
@@ -25,10 +26,11 @@ class DecoratorFromMiddlewareTests(TestCase):
 # We will get type arguments if there is a mismatch in the number of arguments.
 def simple_dec(func):
     def wrapper(request, arg):
-        return func(request, "test:" + arg)
+        return "decorator:" + func(request, arg)
     wrapper = wraps(func)(wrapper)
     wrapper.is_decorated = True
     return wrapper
+
 
 simple_dec_m = method_decorator(simple_dec)
 
@@ -37,15 +39,15 @@ class MethodDecoratorTests(TestCase):
     """
     Tests for method_decorator.
     """
-    
-    @unittest.expectedFailure
+
+
     def test_method_decorator(self):
         class Test(object):
             @simple_dec_m
             def say(self, request, arg):
                 return arg
 
-        self.assertEqual("test:hello", Test().say(None, "hello"))
+        self.assertEqual("decorator:hello", Test().say(None, "hello"))
         self.assertTrue(getattr(Test().say, "is_decorated", False),
                 "Method decorator didn't preserve attributes.")
 
@@ -53,19 +55,62 @@ class MethodDecoratorTests(TestCase):
 class ClassBasedViewDecorationTests(TestCase):
     rf = RequestFactory() 
     
-    def test_decorate_dispatch(self):
-        from django.views.generic import View
-                
-        class MyView(View):
-            
+    def test_decorate_view(self):
+        class TextView(View):
             def get(self, request, text):
-                return "get:" + text
-            
+                return "get:" + text    
             def post(self, request, text):
                 return "post:" + text
-        MyView = view_decorator(simple_dec)(MyView)
+        TextView = view_decorator(simple_dec)(TextView)
         
-        self.assertTrue(getattr(MyView.as_view(), "is_decorated", False),
+        self.assertTrue(getattr(TextView.as_view(), "is_decorated", False),
                     "Class based view decorator didn't preserve attributes.")
-        self.assertEqual(MyView.as_view()(self.rf.get('/'), "hello"), "get:test:hello")
-        self.assertEqual(MyView.as_view()(self.rf.post('/'), "hello"), "post:test:hello")
+        self.assertEqual(TextView.as_view()(self.rf.get('/'), "hello"), "decorator:get:hello")
+        self.assertEqual(TextView.as_view()(self.rf.post('/'), "hello"), "decorator:post:hello")
+        
+    def test_super_in_decorated_class(self):
+        class TextView(View):
+            def dispatch(self, request, text):
+                return "view1:" + text
+
+        # NOTE: it's important for this test, that the definition
+        # and decoration of the class happens in the *same scope*.
+        class ViewWithSuper(TextView):
+            
+            def __init__(self, **initargs):
+                self.recursion_count = 0
+                super(ViewWithSuper, self).__init__(**initargs)
+                
+            def dispatch(self, *args, **kwargs):
+                self.recursion_count += 1
+                if self.recursion_count > 10:
+                    raise Exception("Decoration caused recursive super() calls.")
+                return "view2:" + super(ViewWithSuper, self).dispatch(*args, **kwargs)        
+        ViewWithSuper = view_decorator(simple_dec)(ViewWithSuper)
+        self.assertEqual(ViewWithSuper.as_view()(self.rf.get('/'), "A"), "decorator:view2:view1:A")
+        
+    def test_subclassing_decorated(self):
+        """
+        Test that decorators are always pushed to front
+        """
+        class TextView(View):
+            def dispatch(self, request, text):
+                return "view1:" + text
+        TextView = view_decorator(simple_dec)(TextView)
+        
+        class SubView(TextView):
+            def dispatch(self, *args, **kwargs):
+                return "view2:" + super(SubView, self).dispatch(*args, **kwargs)
+
+        self.assertEqual(SubView.as_view()(self.rf.get('/'), "A"), "decorator:view2:view1:A")
+        
+    @unittest.expectedFailure
+    def test_base_unmodified(self):
+        class TextView(View):
+            attr = "OK"
+            def dispatch(self, request, text):
+                return "view1:" + text            
+        DecoratedView = view_decorator(simple_dec)(TextView)       
+        self.assertFalse(DecoratedView is TextView)
+        self.assertEqual(DecoratedView.mro(), [DecoratedView, TextView, View, object])
+        
