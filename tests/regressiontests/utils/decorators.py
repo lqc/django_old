@@ -68,7 +68,7 @@ class ClassBasedViewDecorationTests(TestCase):
         self.assertEqual(TextView.as_view()(self.rf.get('/'), "hello"), "decorator:get:hello")
         self.assertEqual(TextView.as_view()(self.rf.post('/'), "hello"), "decorator:post:hello")
         
-    def test_super_in_decorated_class(self):
+    def test_super_calls(self):
         class TextView(View):
             def dispatch(self, request, text):
                 return "view1:" + text
@@ -87,6 +87,28 @@ class ClassBasedViewDecorationTests(TestCase):
                     raise Exception("Decoration caused recursive super() calls.")
                 return "view2:" + super(ViewWithSuper, self).dispatch(*args, **kwargs)        
         ViewWithSuper = view_decorator(simple_dec)(ViewWithSuper)
+        self.assertEqual(ViewWithSuper.as_view()(self.rf.get('/'), "A"), "decorator:view2:view1:A")
+        
+    @unittest.expectedFailure
+    def test_super_calls_with_subclassing(self):
+        class TextView(View):
+            def dispatch(self, request, text):
+                return "view1:" + text
+
+        # NOTE: it's important for this test, that the definition
+        # and decoration of the class happens in the *same scope*.
+        class ViewWithSuper(TextView):
+            
+            def __init__(self, **initargs):
+                self.recursion_count = 0
+                super(ViewWithSuper, self).__init__(**initargs)
+                
+            def dispatch(self, *args, **kwargs):
+                self.recursion_count += 1
+                if self.recursion_count > 10:
+                    raise RuntimeError("Decoration caused recursive super() calls.")
+                return "view2:" + super(ViewWithSuper, self).dispatch(*args, **kwargs)        
+        ViewWithSuper = view_decorator(simple_dec, subclassing=True)(ViewWithSuper)
         self.assertEqual(ViewWithSuper.as_view()(self.rf.get('/'), "A"), "decorator:view2:view1:A")
         
     def test_subclassing_decorated(self):
@@ -110,7 +132,22 @@ class ClassBasedViewDecorationTests(TestCase):
             attr = "OK"
             def dispatch(self, request, text):
                 return "view1:" + text            
-        DecoratedView = view_decorator(simple_dec)(TextView)       
+        DecoratedView = view_decorator(simple_dec)(TextView)
+        self.assertEqual(DecoratedView.as_view()(self.rf.get('/'), "A"), "decorator:view1:A")
+        self.assertEqual(TextView.as_view()(self.rf.get('/'), "A"), "view1:A")       
         self.assertFalse(DecoratedView is TextView)
         self.assertEqual(DecoratedView.mro(), [DecoratedView, TextView, View, object])
+        
+    def test_base_unmodified_with_subclassing(self):
+        class TextView(View):
+            attr = "OK"
+            def dispatch(self, request, text):
+                return "view1:" + text            
+        DecoratedView = view_decorator(simple_dec, subclass=True)(TextView)
+        
+        self.assertEqual(DecoratedView.as_view()(self.rf.get('/'), "A"), "decorator:view1:A")
+        self.assertEqual(TextView.as_view()(self.rf.get('/'), "A"), "view1:A")       
+        self.assertFalse(DecoratedView is TextView)
+        self.assertEqual(DecoratedView.mro(), [DecoratedView, TextView, View, object])
+        
         
