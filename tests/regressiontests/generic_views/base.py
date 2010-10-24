@@ -6,6 +6,15 @@ from django.test import TestCase, RequestFactory
 from django.utils import simplejson
 from django.views.generic import View, TemplateView, RedirectView
 
+def prepend_string(text):
+    "Decorator that prepends strings to responses"
+    from django.utils.functional import wraps
+    def decorator(view):
+        @wraps(view)
+        def decorated_view(request, *args, **kwargs):
+            return text + ':' + view(request, *args, **kwargs)
+        return decorated_view
+    return decorator
 
 class SimpleView(View):
     """
@@ -149,6 +158,32 @@ class ViewTest(unittest.TestCase):
         """
         self.assertTrue(DecoratedDispatchView.as_view().is_decorated)
 
+    def test_defining_decorators(self):
+        """
+        Test an alternate method of decoration.
+        """
+        class Base(View):
+            def get(self, request, *args, **kwargs):
+                return "Base"
+
+        class B(Base):
+            decorators = (prepend_string('B'),)
+            
+        class AB(B):
+            decorators = (prepend_string('A'),)
+
+        class CD(Base):
+            # decorators are applied in reverse order 
+            decorators = (prepend_string('C'), prepend_string('D'))
+
+        class ABCD(AB, CD):
+            pass
+
+        self.assertEqual(Base.as_view()(self.rf.get('/')), "Base")
+        self.assertEqual(B.as_view()(self.rf.get('/')), "B:Base")
+        self.assertEqual(AB.as_view()(self.rf.get('/')), "A:B:Base")
+        self.assertEqual(CD.as_view()(self.rf.get('/')), "C:D:Base")
+        self.assertEqual(ABCD.as_view()(self.rf.get('/')), "A:B:C:D:Base")
 
 class TemplateViewTest(TestCase):
     urls = 'regressiontests.generic_views.urls'
