@@ -38,6 +38,7 @@ def method_decorator(decorator):
     _dec.__name__ = 'method_decorator(%s)' % decorator.__name__
     return _dec
 
+
 def view_decorator(fdec, subclass=False):
     """
     Change a function decorator into a view decorator.
@@ -49,32 +50,32 @@ def view_decorator(fdec, subclass=False):
     possible to have functions called in this order:
 
        B.dispatch, login_required, A.dispatch
-       
+
     NOTE: By default this modifies the class it's called upon, so *MUST NOT* do:
-    
+
        TemplateView = view_decorator(login_required)(TemplateView)
-       
+
     Because it will modify the TemplateView class. Instead create a fresh
-    class first and apply the decorator there. A shortcut for this is 
+    class first and apply the decorator there. A shortcut for this is
     specifying the `subclass` argument. This is potentially dangerous. Consider:
-    
+
         @view_decorator(login_required, subclass=True)
         class MyView(View):
-        
+
             def get_context_data(self):
                 data = super(MyView, self).get_context_data()
                 data["foo"] = "bar"
                 return data
-                
+
     This looks like a normal Python code, but there is a hidden infinite
     recursion, because of how `super()` works in Python 2.x; By the time
     `get_context_data()` is invoked, MyView refers to a subclass created in
-    the decorator. super() looks at the next class in the MRO of MyView, 
-    which is the original MyView class we created, so it contains the 
-    `get_context_data()` method. Which is exactly the method that was just 
-    called. BOOM!   
-            
+    the decorator. super() looks at the next class in the MRO of MyView,
+    which is the original MyView class we created, so it contains the
+    `get_context_data()` method. Which is exactly the method that was just
+    called. BOOM!
     """
+
     from django.views.generic.base import classonlymethod
     def decorator(cls):
         if subclass:
