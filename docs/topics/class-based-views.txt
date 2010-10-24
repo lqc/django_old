@@ -537,3 +537,76 @@ Because of the way that Python resolves method overloading, the local
 :func:`render_to_response()` implementation will override the
 versions provided by :class:`JSONResponseMixin` and
 :class:`~django.views.generic.detail.SingleObjectTemplateResponseMixin`.
+
+Decorating
+===========
+
+.. highlightlang:: python
+
+While class-based views and mixins introduce a whole new way of extending
+view behaviour in a reusable way, you also use existing decorators.
+
+Simple decoration
+------------------
+
+The simplest way of decorating class-based views is to decorate the result
+of the :meth:`~django.views.generic.base.View.as_view` method. This
+is most useful in the URLconf::
+
+    from django.views.generic import TemplateView
+    from django.contrib.auth.decorators import login_required
+
+    urlpatterns = patterns('',
+        (r'^about/',login_required(TemplateView.as_view(template_name="secret.html"))),
+    )
+
+The downside of this approach is that you can't define a class-based view with
+the decorator always applied to it.
+
+Overriding ``as_view`` class method
+------------------------------------
+
+If you want your view to have a decorator applied and be able to subclass
+it later, you need to override one of it's methods. The most straightforward
+solution is to override :meth:`~django.views.generic.base.View.as_view`::
+
+    from django.views.generic import TemplateView, classonlymethod
+
+    class ProtectedView(TemplateView):
+
+        @classonlymethod
+        def as_view(cls, **initkwargs):
+            return login_required(super(ProtectedView, cls).as_view(**initkwargs))
+
+This will make the ``ProtectedView`` and any of it's subclasses always apply the
+decorator. You don't need to worry about ``classonlymethod`` decorator.
+It's not required for your view to work, but prevents from invoking
+``as_view()`` on the view's instance by accident.
+
+
+.. note::
+
+    This way of decorating (as the previous one) always applies the decorators
+    at creation time, before any code in `dispatch()` has any chance to run.
+
+Class decorator
+--------------------
+
+Python 2.6 introduces new syntax that allows you to decorate classes. Django
+provides such a decorator for class-based views. The example above can
+be simplified to::
+
+    from django.utils.decorators import view_decorator
+
+    @view_decorator(login_required)
+    class ProtectedView(TemplateView)
+        pass
+
+.. note::
+
+    The decorator modifies the class it was given, so it is **not safe** to decorate
+    generic views this way without creating a subclass.
+
+    If you are absolutly sure you know how super() and MRO works in Python, you
+    can pass ``subclass=True`` to the decorator and it will create a sublass
+    for you. You have been warned!
