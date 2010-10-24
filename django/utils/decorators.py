@@ -78,7 +78,8 @@ def view_decorator(fdec, subclass=False):
     from django.views.generic.base import classonlymethod
     def decorator(cls):
         if subclass:
-            cls = type("%sWithDecorator(%s)" % (cls.__name__, fdec.__name__), (cls,), {})            
+            cls = type("%sWithDecorator(%s)" % (cls.__name__, fdec.__name__), (cls,), {})
+        @wraps(cls.as_view.__func__)
         def as_view(current, **initkwargs):
             return fdec(super(cls, current).as_view(**initkwargs))
         cls.as_view = classonlymethod(as_view)

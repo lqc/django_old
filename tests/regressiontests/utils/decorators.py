@@ -40,7 +40,6 @@ class MethodDecoratorTests(TestCase):
     Tests for method_decorator.
     """
 
-
     def test_method_decorator(self):
         class Test(object):
             @simple_dec_m
@@ -57,6 +56,7 @@ class ClassBasedViewDecorationTests(TestCase):
     
     def test_decorate_view(self):
         class TextView(View):
+            "Docstring"
             def get(self, request, text):
                 return "get:" + text    
             def post(self, request, text):
@@ -65,6 +65,8 @@ class ClassBasedViewDecorationTests(TestCase):
         
         self.assertTrue(getattr(TextView.as_view(), "is_decorated", False),
                     "Class based view decorator didn't preserve attributes.")
+        self.assertEqual(TextView.as_view().__doc__, "Docstring",
+                    "Class based view decorator didn't preserve docstring.")
         self.assertEqual(TextView.as_view()(self.rf.get('/'), "hello"), "decorator:get:hello")
         self.assertEqual(TextView.as_view()(self.rf.post('/'), "hello"), "decorator:post:hello")
         
