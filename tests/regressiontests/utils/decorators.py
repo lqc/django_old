@@ -115,7 +115,7 @@ class ClassBasedViewDecorationTests(TestCase):
                 if self.recursion_count > 10:
                     raise RuntimeError("Decoration caused recursive super() calls.")
                 return "view2:" + super(ViewWithSuper, self).dispatch(*args, **kwargs)
-        ViewWithSuper = view_decorator(simple_dec, subclassing=True)(ViewWithSuper)
+        ViewWithSuper = view_decorator(simple_dec, subclass=True)(ViewWithSuper)
 
         self.assertEqual(ViewWithSuper.as_view()(self.rf.get('/'), "A"), "decorator:view2:view1:A")
 

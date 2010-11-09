@@ -14,7 +14,6 @@ class View(object):
     """
 
     http_method_names = ['get', 'post', 'put', 'delete', 'head', 'options', 'trace']
-    decorators = ()
 
     def __init__(self, **kwargs):
         """
@@ -25,16 +24,6 @@ class View(object):
         # instance, or raise an error.
         for key, value in kwargs.iteritems():
             setattr(self, key, value)
-
-    @classmethod
-    def get_decorators(cls):
-        decorators = []
-        # decorators in the subclass should be applied after the ones in base
-        for klass in reversed(cls.__mro__):
-            # decorators defined in the class should be applied in 
-            # the reverse order they're specified 
-            decorators.extend(reversed(klass.__dict__.get('decorators', ())))
-        return decorators
 
     @classonlymethod
     def as_view(cls, **initkwargs):
@@ -61,11 +50,6 @@ class View(object):
         # and possible attributes set by decorators
         # like csrf_exempt from dispatch
         update_wrapper(view, cls.dispatch, assigned=())
-
-        # apply all defined decorators
-        for decorator in cls.get_decorators():
-            view = decorator(view)
-
         return view
 
     def dispatch(self, request, *args, **kwargs):

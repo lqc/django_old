@@ -55,13 +55,13 @@ def view_decorator(fdec, subclass=False):
 
        B.dispatch, login_required, A.dispatch
 
-    NOTE: By default this modifies the class it's called upon, so *MUST NOT* do:
+    NOTE: By default this modifies the given class, so be careful when doing this:
 
        TemplateView = view_decorator(login_required)(TemplateView)
 
     Because it will modify the TemplateView class. Instead create a fresh
     class first and apply the decorator there. A shortcut for this is
-    specifying the `subclass` argument. This is potentially dangerous. Consider:
+    specifying the ``subclass`` argument. But this is also dangerous. Consider:
 
         @view_decorator(login_required, subclass=True)
         class MyView(View):
@@ -79,12 +79,10 @@ def view_decorator(fdec, subclass=False):
     `get_context_data()` method. Which is exactly the method that was just
     called. BOOM!
     """
-
-    from django.views.generic.base import classonlymethod
     def decorator(cls):
         if subclass:
             cls = type("%sWithDecorator(%s)" % (cls.__name__, fdec.__name__), (cls,), {})
-        @wraps(cls.as_view.__func__)
+        @wraps(cls.as_view)
         def as_view(current, **initkwargs):
             return fdec(super(cls, current).as_view(**initkwargs))
         cls.as_view = classonlymethod(as_view)
