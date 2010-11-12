@@ -32,7 +32,7 @@ class Command(BaseCommand):
         from django.contrib.staticfiles.handlers import StaticFilesHandler
         enable_ipv6 = options.get('enable_ipv6')
         if enable_ipv6 and not hasattr(socket, 'AF_INET6'):
-            raise CommandError("This Python does not support IPv6.")
+            raise CommandError("Your Python does not support IPv6.")
 
         if args:
             raise CommandError('Usage is runserver %s' % self.args)
@@ -42,6 +42,15 @@ class Command(BaseCommand):
         else:
             try:
                 addr, port = addrport.rsplit(':', 1)
+                if (addr[:1] == '[') ^ (addr[-1:] == ']'):
+                    raise CommandError("IPv6 addresses must surrounded by "
+                            "square brackets like: [200a::1]")
+                if addr[:1] == '[' and addr[-1:] == ']':
+                    enable_ipv6 = True
+                    addr = addr[1:-1]
+                elif enable_ipv6 and addr:
+                    raise CommandError("IPv6 addresses must surrounded by "
+                            "square brackets like: [200a::1]")
             except ValueError:
                 addr, port = '', addrport
         if not addr:

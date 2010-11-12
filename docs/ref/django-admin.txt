@@ -706,8 +706,7 @@ Example usage::
 
     django-admin.py runserver --insecure
 
---ipv6
-~~~~~~
+.. django-admin-option:: --ipv6
 
 Use the ``--ipv6`` option to tell Django to enable IPv6 for the development
 server. This allows you to specify IPv6 addresses in colon-delimited form and
@@ -730,7 +729,7 @@ Port 8000 on IP address 1.2.3.4::
 
 Port 8000 on IPv6 address 2001:0db8:1234:5678::9::
 
-	django-admin.py runserver --ipv6 2001:0db8:1234:5678::9:8000
+	django-admin.py runserver --ipv6 [2001:0db8:1234:5678::9]:8000
 
 Port 7000 on IP address 127.0.0.1::
 
@@ -742,7 +741,7 @@ Port 7000 on IP address 1.2.3.4::
 
 Port 7000 on IPv6 address 2001:0db8:1234:5678::9::
 
-    django-admin.py runserver --ipv6 2001:0db8:1234:5678::9:7000
+    django-admin.py runserver --ipv6 [2001:0db8:1234:5678::9]:7000
 
 Serving static files with the development server
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
