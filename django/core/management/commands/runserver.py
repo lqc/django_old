@@ -3,13 +3,17 @@ import os
 import socket
 import sys
 import warnings
+import re
 
 from django.core.management.base import BaseCommand, CommandError
+
+naiveip_re = r'^(?:(?P<addr>\d{1,3}(?:\.\d{1,3}){3}|\[[a-fA-F0-9:]+\]):)?(?P<port>\d+)$'
+DEFAULT_PORT = 8000
 
 class Command(BaseCommand):
     option_list = BaseCommand.option_list + (
         make_option('--ipv6', '-6', action='store_true', dest='enable_ipv6', default=False,
-            help='Enables IPv6 support.'),
+            help='Force the use of IPv6 address.'),
         make_option('--noreload', action='store_false', dest='use_reloader', default=True,
             help='Tells Django to NOT use the auto-reloader.'),
         make_option('--nostatic', action="store_false", dest='use_static_handler', default=True,
@@ -38,27 +42,24 @@ class Command(BaseCommand):
             raise CommandError('Usage is runserver %s' % self.args)
         if not addrport:
             addr = ''
-            port = '8000'
+            port = DEFAULT_PORT
         else:
+            m = re.match(naiveip_re, addrport)
+            if m is None:
+                raise CommandError("%r is not a valid port number or address:port pair." % addrport)
+            addr, port = m.groups()
             try:
-                addr, port = addrport.rsplit(':', 1)
-                if (addr[:1] == '[') ^ (addr[-1:] == ']'):
-                    raise CommandError("IPv6 addresses must surrounded by "
-                            "square brackets like: [200a::1]")
-                if addr[:1] == '[' and addr[-1:] == ']':
+                port = int(port)
+            except TypeError:
+                port = DEFAULT_PORT
+            if addr:
+                if addr[0] == '[' and addr[-1] == ']':
                     enable_ipv6 = True
                     addr = addr[1:-1]
-                elif enable_ipv6 and addr:
-                    raise CommandError("IPv6 addresses must surrounded by "
-                            "square brackets like: [200a::1]")
-            except ValueError:
-                addr, port = '', addrport
+                elif enable_ipv6:
+                    raise CommandError("IPv6 addresses must be surrounded with brackets")
         if not addr:
             addr = (enable_ipv6 and '::1') or '127.0.0.1'
-
-        if not port.isdigit():
-            raise CommandError("%r is not a valid port number." % port)
-
         use_reloader = options.get('use_reloader', True)
         admin_media_path = options.get('admin_media_path', '')
         shutdown_message = options.get('shutdown_message', '')
