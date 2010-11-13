@@ -8,7 +8,7 @@ import re
 from django.core.management.base import BaseCommand, CommandError
 
 naiveip_re = r'^(?:(?P<addr>\d{1,3}(?:\.\d{1,3}){3}|\[[a-fA-F0-9:]+\]):)?(?P<port>\d+)$'
-DEFAULT_PORT = 8000
+DEFAULT_PORT = "8000"
 
 class Command(BaseCommand):
     option_list = BaseCommand.option_list + (
@@ -48,10 +48,8 @@ class Command(BaseCommand):
             if m is None:
                 raise CommandError("%r is not a valid port number or address:port pair." % addrport)
             addr, port = m.groups()
-            try:
-                port = int(port)
-            except TypeError:
-                port = DEFAULT_PORT
+            if not port.isdigit():
+                raise CommandError("%r is not a valid port number." % port)
             if addr:
                 if addr[0] == '[' and addr[-1] == ']':
                     enable_ipv6 = True
