@@ -250,3 +250,15 @@ class PasswordResetFormTest(TestCase):
         self.assertEqual(user.email, 'tesT@example.com')
         user = User.objects.create_user('forms_test3', 'tesT', 'test')
         self.assertEqual(user.email, 'tesT')
+
+    def test_unusable_password(self):
+        user = User.objects.create_user('testuser', 'test@example.com', 'test')
+        data = {"email": "test@example.com"}
+        form = PasswordResetForm(data)
+        self.assertTrue(form.is_valid())
+        user.set_unusable_password()
+        user.save()
+        form = PasswordResetForm(data)
+        self.assertFalse(form.is_valid())
+        self.assertEqual(form["email"].errors, 
+                         [u"The user account associated with this email address is not allowed to reset it's password."])

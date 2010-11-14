@@ -1,4 +1,4 @@
-from django.contrib.auth.models import User
+from django.contrib.auth.models import User, UNUSABLE_PASSWORD
 from django.contrib.auth import authenticate
 from django.contrib.auth.tokens import default_token_generator
 from django.contrib.sites.models import get_current_site
@@ -112,7 +112,9 @@ class PasswordResetForm(forms.Form):
         """
         email = self.cleaned_data["email"]
         self.users_cache = User.objects.filter(email__iexact=email)
-        if len(self.users_cache) == 0:
+        if self.users_cache.filter(password=UNUSABLE_PASSWORD).exists():
+            raise forms.ValidationError(_("The user account associated with this email address cannot reset it's password."))
+        if self.users_cache.exists():
             raise forms.ValidationError(_("That e-mail address doesn't have an associated user account. Are you sure you've registered?"))
         return email
 

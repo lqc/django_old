@@ -945,6 +945,14 @@ includes a few other useful built-in views located in
 
         * ``form``: The form for resetting the user's password.
 
+    .. note::
+
+       Users flagged with an unusable password (see 
+       :meth:`~django.contrib.auth.models.User.set_unusable_password()` 
+       will not be able to request a password reset. This is done to 
+       prevent a password reset when using an external authentication 
+       source like LDAP.
+
 .. function:: views.password_reset_done(request[, template_name])
 
     The page shown after a user has reset their password.
