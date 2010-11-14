@@ -6,6 +6,7 @@ from django.template import Context, loader
 from django import forms
 from django.utils.translation import ugettext_lazy as _
 from django.utils.http import int_to_base36
+from django.utils.itercompat import any
 
 class UserCreationForm(forms.ModelForm):
     """
@@ -112,10 +113,10 @@ class PasswordResetForm(forms.Form):
         """
         email = self.cleaned_data["email"]
         self.users_cache = User.objects.filter(email__iexact=email)
-        if self.users_cache.filter(password=UNUSABLE_PASSWORD).exists():
-            raise forms.ValidationError(_("The user account associated with this email address cannot reset it's password."))
-        if self.users_cache.exists():
+        if not len(self.users_cache):
             raise forms.ValidationError(_("That e-mail address doesn't have an associated user account. Are you sure you've registered?"))
+        if any((user.password == UNUSABLE_PASSWORD) for user in self.users_cache):
+            raise forms.ValidationError(_("The user account associated with this email address cannot reset it's password."))
         return email
 
     def save(self, domain_override=None, email_template_name='registration/password_reset_email.html',

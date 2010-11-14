@@ -260,5 +260,5 @@ class PasswordResetFormTest(TestCase):
         user.save()
         form = PasswordResetForm(data)
         self.assertFalse(form.is_valid())
-        self.assertEqual(form["email"].errors, 
-                         [u"The user account associated with this email address is not allowed to reset it's password."])
+        self.assertEqual(form["email"].errors,
+                         [u"The user account associated with this email address cannot reset it's password."])
