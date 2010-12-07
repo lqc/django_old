@@ -87,7 +87,7 @@ def view_decorator(fdec, subclass=False):
         original = cls.as_view.im_func
         @wraps(original)
         def as_view(current, **initkwargs):
-            return fdec(original(cls, **initkwargs))
+            return fdec(original(current, **initkwargs))
         cls.as_view = classonlymethod(as_view)
         return cls
     return decorator
