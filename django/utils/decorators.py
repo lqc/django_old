@@ -80,11 +80,14 @@ def view_decorator(fdec, subclass=False):
     called. BOOM!
     """
     def decorator(cls):
+        if not hasattr(cls, "as_view"):
+            raise TypeError("You should only decorate subclasses of View, not mixins.")
         if subclass:
             cls = type("%sWithDecorator(%s)" % (cls.__name__, fdec.__name__), (cls,), {})
-        @wraps(cls.as_view)
+        original = cls.as_view.im_func
+        @wraps(original)
         def as_view(current, **initkwargs):
-            return fdec(super(cls, current).as_view(**initkwargs))
+            return fdec(original(cls, **initkwargs))
         cls.as_view = classonlymethod(as_view)
         return cls
     return decorator

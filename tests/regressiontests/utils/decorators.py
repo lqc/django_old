@@ -37,6 +37,16 @@ def simple_dec(func):
     return wrapper
 
 
+def dec_with_arg(decarg):
+    def decorator(view):
+        @wraps(view)
+        def wrapped(request, arg):
+            return "dec(%s):%s" % (decarg, view(request, arg))
+        return wrapped
+    decorator.__name__ = "Decorator(%s)" % decarg
+    return decorator
+
+
 class MethodDecoratorTests(TestCase):
     """
     Tests for method_decorator.
@@ -73,6 +83,16 @@ class ClassBasedViewDecorationTests(TestCase):
                     "Class based view decorator didn't preserve docstring.")
         self.assertEqual(TextView.as_view()(self.rf.get('/'), "hello"), "decorator:get:hello")
         self.assertEqual(TextView.as_view()(self.rf.post('/'), "hello"), "decorator:post:hello")
+
+    def test_multiply_decorators(self):
+        class TextView(View):
+            def dispatch(self, request, text):
+                return "view:" + text
+
+        TextView = view_decorator(dec_with_arg("bottom"))(TextView)
+        TextView = view_decorator(dec_with_arg("top"))(TextView)
+        v = TextView.as_view()       
+        self.assertEqual(v(self.rf.get('/'), "hello"), "dec(top):dec(bottom):view:hello")
 
     def test_super_calls(self):
         class TextView(View):
