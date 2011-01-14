@@ -12,12 +12,13 @@ from django.conf import settings
 from django.core import mail
 from django.core.mail import EmailMessage, mail_admins, mail_managers, EmailMultiAlternatives
 from django.core.mail import send_mail, send_mass_mail
-from django.core.mail.backends.base import BaseEmailBackend
 from django.core.mail.backends import console, dummy, locmem, filebased, smtp
 from django.core.mail.message import BadHeaderError
 from django.test import TestCase
 from django.utils.translation import ugettext_lazy
 from django.utils.functional import wraps
+from email.Utils import parseaddr
+
 
 def alter_global_settings(**kwargs):
     oldvalues = {}
@@ -30,12 +31,14 @@ def alter_global_settings(**kwargs):
         setattr(settings, setting, newvalue)
     return oldvalues, nonexistant
 
+
 def restore_global_settings(state):
     oldvalues, nonexistant = state
     for setting, oldvalue in oldvalues.iteritems():
         setattr(settings, setting, oldvalue)
     for setting in nonexistant:
         delattr(settings, setting)
+
 
 def with_global_setting(**kwargs):
     def decorator(test):
@@ -132,7 +135,7 @@ class MailTests(TestCase):
         message = email.message()
         self.assertEqual(message['From'], 'from@example.com')
 
-    def test_unicode_header(self):
+    def test_unicode_address_header(self):
         """
         Regression for #11144 - When a to/from/cc header contains unicode,
         make sure the email addresses are parsed correctly (especially with
@@ -142,6 +145,15 @@ class MailTests(TestCase):
         self.assertEqual(email.message()['To'], '=?utf-8?q?Firstname_S=C3=BCrname?= <to@example.com>, other@example.com')
         email = EmailMessage('Subject', 'Content', 'from@example.com', ['"Sürname, Firstname" <to@example.com>', 'other@example.com'])
         self.assertEqual(email.message()['To'], '=?utf-8?q?S=C3=BCrname=2C_Firstname?= <to@example.com>, other@example.com')
+
+    def test_unicode_headers(self):
+        email = EmailMessage(u"Gżegżółka", "Content", "from@example.com", ["to@example.com"],
+                             headers={"Sender": '"Firstname Sürname" <sender@example.com>',
+                                      "Comments": 'My Sürname is non-ASCII'})
+        message = email.message()
+        self.assertEqual(message['Subject'], '=?utf-8?b?R8W8ZWfFvMOzxYJrYQ==?=')
+        self.assertEqual(message['Sender'], '=?utf-8?q?Firstname_S=C3=BCrname?= <sender@example.com>')
+        self.assertEqual(message['Comments'], '=?utf-8?q?My_S=C3=BCrname_is_non-ASCII?=')
 
     def test_safe_mime_multipart(self):
         """
@@ -240,7 +252,7 @@ class MailTests(TestCase):
     def test_connection_arg(self):
         """Test connection argument to send_mail(), et. al."""
         mail.outbox = []
-        
+
         # Send using non-default connection
         connection = mail.get_connection('regressiontests.mail.custombackend.EmailBackend')
         send_mail('Subject', 'Content', 'from@example.com', ['to@example.com'], connection=connection)
@@ -251,7 +263,7 @@ class MailTests(TestCase):
         connection = mail.get_connection('regressiontests.mail.custombackend.EmailBackend')
         send_mass_mail([
                 ('Subject1', 'Content1', 'from1@example.com', ['to1@example.com']),
-                ('Subject2', 'Content2', 'from2@example.com', ['to2@example.com'])
+                ('Subject2', 'Content2', 'from2@example.com', ['to2@example.com']),
             ], connection=connection)
         self.assertEqual(mail.outbox, [])
         self.assertEqual(len(connection.test_outbox), 2)
@@ -270,33 +282,34 @@ class MailTests(TestCase):
         self.assertEqual(len(connection.test_outbox), 1)
         self.assertEqual(connection.test_outbox[0].subject, '[Django] Manager message')
 
+
 class BaseEmailBackendTests(object):
     email_backend = None
-    
+
     def setUp(self):
         self.__settings_state = alter_global_settings(EMAIL_BACKEND=self.email_backend)
-    
+
     def tearDown(self):
         restore_global_settings(self.__settings_state)
-        
+
     def assertStartsWith(self, first, second):
         if not first.startswith(second):
             self.longMessage = True
             self.assertEqual(first[:len(second)], second, "First string doesn't start with the second.")
-        
+
     def get_mailbox_content(self):
         raise NotImplementedError
-    
+
     def flush_mailbox(self):
         raise NotImplementedError
-    
+
     def get_the_message(self):
         mailbox = self.get_mailbox_content()
         self.assertEqual(len(mailbox), 1,
             "Expected exactly one message, got %d.\n%r" % (len(mailbox), [
                 m.as_string() for m in mailbox]))
         return mailbox[0]
-    
+
     def test_send(self):
         email = EmailMessage('Subject', 'Content', 'from@example.com', ['to@example.com'])
         num_sent = mail.get_connection().send_messages([email])
@@ -306,7 +319,7 @@ class BaseEmailBackendTests(object):
         self.assertEqual(message.get_payload(), "Content")
         self.assertEqual(message["from"], "from@example.com")
         self.assertEqual(message.get_all("to"), ["to@example.com"])
-        
+
     def test_send_many(self):
         email1 = EmailMessage('Subject', 'Content1', 'from@example.com', ['to@example.com'])
         email2 = EmailMessage('Subject', 'Content2', 'from@example.com', ['to@example.com'])
@@ -316,13 +329,22 @@ class BaseEmailBackendTests(object):
         self.assertEquals(len(messages), 2)
         self.assertEqual(messages[0].get_payload(), "Content1")
         self.assertEqual(messages[1].get_payload(), "Content2")
-    
+
+    def test_send_verbose_name(self):
+        email = EmailMessage("Subject", "Content", '"Firstname Sürname" <from@example.com>',
+                             ["to@example.com"])
+        email.send()
+        message = self.get_the_message()
+        self.assertEqual(message["subject"], "Subject")
+        self.assertEqual(message.get_payload(), "Content")
+        self.assertEqual(message["from"], "=?utf-8?q?Firstname_S=C3=BCrname?= <from@example.com>")
+
     @with_global_setting(MANAGERS=[('nobody', 'nobody@example.com')])
     def test_html_mail_managers(self):
         """Test html_message argument to mail_managers"""
         mail_managers('Subject', 'Content', html_message='HTML Content')
         message = self.get_the_message()
-        
+
         self.assertEqual(message.get('subject'), '[Django] Subject')
         self.assertEqual(message.get_all('to'), ['nobody@example.com'])
         self.assertTrue(message.is_multipart())
@@ -331,13 +353,13 @@ class BaseEmailBackendTests(object):
         self.assertEqual(message.get_payload(0).get_content_type(), 'text/plain')
         self.assertEqual(message.get_payload(1).get_payload(), 'HTML Content')
         self.assertEqual(message.get_payload(1).get_content_type(), 'text/html')
-        
+
     @with_global_setting(ADMINS=[('nobody', 'nobody@example.com')])
     def test_html_mail_admins(self):
         """Test html_message argument to mail_admins """
         mail_admins('Subject', 'Content', html_message='HTML Content')
         message = self.get_the_message()
-        
+
         self.assertEqual(message.get('subject'), '[Django] Subject')
         self.assertEqual(message.get_all('to'), ['nobody@example.com'])
         self.assertTrue(message.is_multipart())
@@ -346,23 +368,23 @@ class BaseEmailBackendTests(object):
         self.assertEqual(message.get_payload(0).get_content_type(), 'text/plain')
         self.assertEqual(message.get_payload(1).get_payload(), 'HTML Content')
         self.assertEqual(message.get_payload(1).get_content_type(), 'text/html')
-        
+
     @with_global_setting(ADMINS=[('nobody', 'nobody+admin@example.com')],
                          MANAGERS=[('nobody', 'nobody+manager@example.com')])
     def test_manager_and_admin_mail_prefix(self):
         """
-            Regression for #13494: 
+            Regression for #13494:
              string prefix + lazy translated subject = bad output
         """
         mail_managers(ugettext_lazy('Subject'), 'Content')
         message = self.get_the_message()
         self.assertEqual(message.get('subject'), '[Django] Subject')
-        
+
         self.flush_mailbox()
         mail_admins(ugettext_lazy('Subject'), 'Content')
         message = self.get_the_message()
         self.assertEqual(message.get('subject'), '[Django] Subject')
-    
+
     @with_global_setting(ADMINS=(), MANAGERS=())
     def test_empty_admins(self):
         """
@@ -376,13 +398,13 @@ class BaseEmailBackendTests(object):
 
     def test_message_cc_header(self):
         """
-            Regression test for #7722 
+            Regression test for #7722
         """
         email = EmailMessage('Subject', 'Content', 'from@example.com', ['to@example.com'], cc=['cc@example.com'])
         mail.get_connection().send_messages([email])
         message = self.get_the_message()
         self.assertStartsWith(message.as_string(), 'Content-Type: text/plain; charset="utf-8"\nMIME-Version: 1.0\nContent-Transfer-Encoding: quoted-printable\nSubject: Subject\nFrom: from@example.com\nTo: to@example.com\nCc: cc@example.com\nDate: ')
-    
+
     def test_idn_send(self):
         """
             Regression test for #14301
@@ -392,9 +414,9 @@ class BaseEmailBackendTests(object):
         self.assertEqual(message.get('subject'), 'Subject')
         self.assertEqual(message.get('from'), 'from@xn--4ca9at.com')
         self.assertEqual(message.get('to'), 'to@xn--4ca9at.com')
-        
+
         self.flush_mailbox()
-        m = EmailMessage('Subject', 'Content', 'from@öäü.com', 
+        m = EmailMessage('Subject', 'Content', 'from@öäü.com',
                      [u'to@öäü.com'], cc=[u'cc@öäü.com'])
         m.send()
         message = self.get_the_message()
@@ -422,11 +444,11 @@ class LocmemBackendTests(BaseEmailBackendTests, TestCase):
 
     def flush_mailbox(self):
         mail.outbox = []
-    
+
     def tearDown(self):
         super(LocmemBackendTests, self).tearDown()
         mail.outbox = []
-        
+
     def test_locmem_shared_messages(self):
         """
         Make sure that the locmen backend populates the outbox.
@@ -437,11 +459,11 @@ class LocmemBackendTests(BaseEmailBackendTests, TestCase):
         connection.send_messages([email])
         connection2.send_messages([email])
         self.assertEqual(len(mail.outbox), 2)
-     
-        
+
+
 class FileBackendTests(BaseEmailBackendTests, TestCase):
     email_backend = 'django.core.mail.backends.filebased.EmailBackend'
-    
+
     def setUp(self):
         super(FileBackendTests, self).setUp()
         self.tmp_dir = tempfile.mkdtemp()
@@ -451,24 +473,24 @@ class FileBackendTests(BaseEmailBackendTests, TestCase):
         restore_global_settings(self.__settings_state)
         shutil.rmtree(self.tmp_dir)
         super(FileBackendTests, self).tearDown()
-        
+
     def flush_mailbox(self):
         for filename in os.listdir(self.tmp_dir):
             os.unlink(os.path.join(self.tmp_dir, filename))
-            
+
     def get_mailbox_content(self):
         messages = []
         for filename in os.listdir(self.tmp_dir):
-            session = open(os.path.join(self.tmp_dir, filename)).read().split('\n' + ('-'*79) + '\n')
+            session = open(os.path.join(self.tmp_dir, filename)).read().split('\n' + ('-' * 79) + '\n')
             messages.extend(email.message_from_string(m) for m in session if m)
         return messages
-        
+
     def test_file_sessions(self):
         """Make sure opening a connection creates a new file"""
         msg = EmailMessage('Subject', 'Content', 'bounce@example.com', ['to@example.com'], headers={'From': 'from@example.com'})
         connection = mail.get_connection()
         connection.send_messages([msg])
-        
+
         self.assertEqual(len(os.listdir(self.tmp_dir)), 1)
         message = email.message_from_file(open(os.path.join(self.tmp_dir, os.listdir(self.tmp_dir)[0])))
         self.assertEqual(message.get_content_type(), 'text/plain')
@@ -482,7 +504,7 @@ class FileBackendTests(BaseEmailBackendTests, TestCase):
 
         connection.send_messages([msg])
         self.assertEqual(len(os.listdir(self.tmp_dir)), 2)
-        
+
         msg.connection = mail.get_connection()
         self.assertTrue(connection.open())
         msg.send()
@@ -490,9 +512,10 @@ class FileBackendTests(BaseEmailBackendTests, TestCase):
         msg.send()
         self.assertEqual(len(os.listdir(self.tmp_dir)), 3)
 
+
 class ConsoleBackendTests(BaseEmailBackendTests, TestCase):
     email_backend = 'django.core.mail.backends.console.EmailBackend'
-    
+
     def setUp(self):
         super(ConsoleBackendTests, self).setUp()
         self.__stdout = sys.stdout
@@ -503,14 +526,14 @@ class ConsoleBackendTests(BaseEmailBackendTests, TestCase):
         sys.stdout = self.__stdout
         del self.__stdout
         super(ConsoleBackendTests, self).tearDown()
-        
+
     def flush_mailbox(self):
         self.stream = sys.stdout = StringIO()
-            
+
     def get_mailbox_content(self):
-        messages = self.stream.getvalue().split('\n' + ('-'*79) + '\n')
+        messages = self.stream.getvalue().split('\n' + ('-' * 79) + '\n')
         return [email.message_from_string(m) for m in messages if m]
-    
+
     def test_console_stream_kwarg(self):
         """
         Test that the console backend can be pointed at an arbitrary stream.
@@ -520,11 +543,13 @@ class ConsoleBackendTests(BaseEmailBackendTests, TestCase):
         send_mail('Subject', 'Content', 'from@example.com', ['to@example.com'], connection=connection)
         self.assertTrue(s.getvalue().startswith('Content-Type: text/plain; charset="utf-8"\nMIME-Version: 1.0\nContent-Transfer-Encoding: quoted-printable\nSubject: Subject\nFrom: from@example.com\nTo: to@example.com\nDate: '))
 
+
 class FakeSMTPServer(smtpd.SMTPServer, threading.Thread):
     """
-    Asyncore SMTP server wrapped into a thread.
+    Asyncore SMTP server wrapped into a thread. Based on DummyFTPServer from:
+    http://svn.python.org/view/python/branches/py3k/Lib/test/test_ftplib.py?revision=86061&view=markup
     """
-    
+
     def __init__(self, *args, **kwargs):
         threading.Thread.__init__(self)
         smtpd.SMTPServer.__init__(self, *args, **kwargs)
@@ -532,17 +557,23 @@ class FakeSMTPServer(smtpd.SMTPServer, threading.Thread):
         self.active = False
         self.active_lock = threading.Lock()
         self.sink_lock = threading.Lock()
-    
+
     def process_message(self, peer, mailfrom, rcpttos, data):
-        self._sink.append(data)
-    
+        m = email.message_from_string(data)
+        maddr = parseaddr(m.get('from'))[1]
+        if mailfrom != maddr:
+            return "553 '%s' != '%s'" % (mailfrom, maddr)
+        self.sink_lock.acquire()
+        self._sink.append(m)
+        self.sink_lock.release()
+
     def get_sink(self):
         self.sink_lock.acquire()
         try:
-            return self._sink
+            return self._sink[:]
         finally:
             self.sink_lock.release()
-            
+
     def flush_sink(self):
         self.sink_lock.acquire()
         self._sink[:] = []
@@ -568,9 +599,10 @@ class FakeSMTPServer(smtpd.SMTPServer, threading.Thread):
         self.active = False
         self.join()
 
+
 class SMTPBackendTests(BaseEmailBackendTests, TestCase):
     email_backend = 'django.core.mail.backends.smtp.EmailBackend'
-    
+
     @classmethod
     def setUpClass(cls):
         cls.__server = FakeSMTPServer(('127.0.0.1', 0), None)
@@ -578,7 +610,7 @@ class SMTPBackendTests(BaseEmailBackendTests, TestCase):
             EMAIL_HOST="127.0.0.1",
             EMAIL_PORT=cls.__server.socket.getsockname()[1])
         cls.__server.start()
-        
+
     @classmethod
     def tearDownClass(cls):
         cls.__server.stop()
@@ -595,4 +627,4 @@ class SMTPBackendTests(BaseEmailBackendTests, TestCase):
         self.__server.flush_sink()
 
     def get_mailbox_content(self):
-        return [email.message_from_string(m) for m in self.__server.get_sink()]
+        return self.__server.get_sink()
