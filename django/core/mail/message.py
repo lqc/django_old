@@ -2,6 +2,7 @@ import mimetypes
 import os
 import random
 import time
+import quopri
 from email import Charset, Encoders
 from email.MIMEText import MIMEText
 from email.MIMEMultipart import MIMEMultipart
@@ -64,21 +65,28 @@ def forbid_multi_line_headers(name, val, encoding):
         val = val.encode('ascii')
     except UnicodeEncodeError:
         if name.lower() in ('to', 'from', 'cc'):
-            result = []
-            for nm, addr in getaddresses((val,)):
-                nm = str(Header(nm.encode(encoding), encoding))
-                try:
-                    addr = addr.encode('ascii')
-                except UnicodeEncodeError:  # IDN
-                    addr = str(Header(addr.encode(encoding), encoding))
-                result.append(formataddr((nm, addr)))
-            val = ', '.join(result)
+            val = ', '.join(sanitize_address(nm, addr, encoding)
+                for nm, addr in getaddresses((val,)))
         else:
-            val = Header(val.encode(encoding), encoding)
+            val = Header(val, encoding)
     else:
         if name.lower() == 'subject':
             val = Header(val)
     return name, val
+
+def sanitize_address(nm, addr, encoding):
+    nm = str(Header(nm, encoding))
+    try:
+        addr = addr.encode('ascii')
+    except UnicodeEncodeError:  # IDN
+        if u'@' in addr:
+            localpart, domain = addr.split(u'@', 1)
+            localpart = str(Header(localpart, encoding))
+            domain = domain.encode('idna')
+            addr = '@'.join([localpart, domain])
+        else:
+            addr = str(Header(addr, encoding))
+    return formataddr((nm, addr))
 
 class SafeMIMEText(MIMEText):
     
@@ -274,7 +282,7 @@ class EmailMultiAlternatives(EmailMessage):
         conversions.
         """
         super(EmailMultiAlternatives, self).__init__(subject, body, from_email, to, bcc, connection, attachments, headers, cc)
-        self.alternatives=alternatives or []
+        self.alternatives = alternatives or []
 
     def attach_alternative(self, content, mimetype):
         """Attach an alternative content representation."""

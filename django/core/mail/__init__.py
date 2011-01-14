@@ -86,8 +86,8 @@ def send_mass_mail(datatuple, fail_silently=False, auth_user=None,
 def mail_admins(subject, message, fail_silently=False, connection=None,
                 html_message=None):
     """Sends a message to the admins, as defined by the ADMINS setting."""
-    if not settings.ADMINS:
-        return
+#    if not settings.ADMINS:
+#        return
     mail = EmailMultiAlternatives(u'%s%s' % (settings.EMAIL_SUBJECT_PREFIX, subject),
                 message, settings.SERVER_EMAIL, [a[1] for a in settings.ADMINS],
                 connection=connection)
