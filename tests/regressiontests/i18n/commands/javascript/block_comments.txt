@@ -1,0 +1,14 @@
+/* / ' */ gettext("Line1");
+function() {
+  /*
+   * Some long comment/message that doesn't do anything
+   */
+   gettext("Line6A"); /* */ gettext("Line6B");
+   /* one line comment */
+   gettext("Line8");
+   /* 
+    * Another comment with magic sequence / ' 
+    */
+    gettext("Line12");
+   /* gettext("Ignore") */
+}

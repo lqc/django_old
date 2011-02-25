@@ -10,8 +10,22 @@ from subprocess import PIPE, Popen
 from django.core.management.base import CommandError, NoArgsCommand
 from django.utils.text import get_text_list
 
-pythonize_re = re.compile(r'(?:^|\n)\s*//')
 plural_forms_re = re.compile(r'^(?P<value>"Plural-Forms.+?\\n")\s*$', re.MULTILINE | re.DOTALL)
+
+# this removes everything after comment, so the next regexp
+# doesn't messup anything
+jspythonize_re = re.compile(r'(?:^|\n)\s*//.*')
+jsblockcomments_re = re.compile(r'/\*(.+?)\*/', re.DOTALL)
+
+def pythonizejs(text):
+    def block_comment_replacement(m):
+        nlcount = m.group(1).count('\n')
+        if not nlcount:
+            return ""
+        return '\n'.join("#" * (nlcount + 1))
+    text = jspythonize_re.sub('\n#', text)
+    text = jsblockcomments_re.sub(block_comment_replacement, text)
+    return text
 
 def handle_extensions(extensions=('html',)):
     """
@@ -184,7 +198,7 @@ def make_messages(locale=None, domain='django', verbosity='1', all=False,
                 if verbosity > 1:
                     sys.stdout.write('processing file %s in %s\n' % (file, dirpath))
                 src = open(os.path.join(dirpath, file), "rU").read()
-                src = pythonize_re.sub('\n#', src)
+                src = pythonizejs(src)
                 thefile = '%s.py' % file
                 f = open(os.path.join(dirpath, thefile), "w")
                 try:

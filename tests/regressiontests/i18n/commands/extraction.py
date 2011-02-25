@@ -27,15 +27,22 @@ class ExtractorTests(TestCase):
             pass
         os.chdir(self._cwd)
 
-    def assertMsgId(self, msgid, s, use_quotes=True):
+    def assertMsgId(self, msgid, text, use_quotes=True):
         if use_quotes:
             msgid = '"%s"' % msgid
-        return self.assert_(re.search('^msgid %s' % msgid, s, re.MULTILINE))
+        self.assertRegexpMatches(text, '(?m)^msgid %s' % re.escape(msgid))
 
-    def assertNotMsgId(self, msgid, s, use_quotes=True):
+    def assertMsgIdLineNumber(self, msgid, linenumber, text, use_quotes=True):
         if use_quotes:
             msgid = '"%s"' % msgid
-        return self.assert_(not re.search('^msgid %s' % msgid, s, re.MULTILINE))
+        m = re.search('^#: .+:(\d+)\n^msgid %s' % re.escape(msgid), text, re.M)
+        self.assertIsNotNone(m)
+        self.assertEqual(int(m.group(1)), linenumber)
+
+    def assertNotMsgId(self, msgid, text, use_quotes=True):
+        if use_quotes:
+            msgid = '"%s"' % msgid
+        self.assertNotRegexpMatches(text, '(?m)^msgid %s' % re.escape(msgid))
 
 
 class BasicExtractorTests(ExtractorTests):
@@ -57,7 +64,7 @@ class BasicExtractorTests(ExtractorTests):
         self.assert_(os.path.exists(self.PO_FILE))
         po_contents = open(self.PO_FILE, 'r').read()
         self.assertMsgId('I think that 100%% is more that 50%% of anything.', po_contents)
-        self.assertMsgId('I think that 100%% is more that 50%% of %\(obj\)s.', po_contents)
+        self.assertMsgId('I think that 100%% is more that 50%% of %(obj)s.', po_contents)
 
     def test_extraction_error(self):
         os.chdir(self.test_dir)
@@ -79,12 +86,39 @@ class JavascriptExtractorTests(ExtractorTests):
 
     def test_javascript_literals(self):
         os.chdir(self.test_dir)
-        management.call_command('makemessages', domain='djangojs', locale=LOCALE, verbosity=0)
-        self.assert_(os.path.exists(self.PO_FILE))
-        po_contents = open(self.PO_FILE, 'r').read()
-        self.assertMsgId('This literal should be included.', po_contents)
-        self.assertMsgId('This one as well.', po_contents)
+        shutil.copyfile('./javascript/literals.txt', './javascript.js')
+        try:
+            management.call_command('makemessages', domain='djangojs', locale=LOCALE, verbosity=0)
+            self.assert_(os.path.exists(self.PO_FILE))
+            po_contents = open(self.PO_FILE, 'r').read()
+            self.assertMsgId('This literal should be included.', po_contents)
+            self.assertMsgId('This one as well.', po_contents)
+            self.assertMsgId('This too', po_contents)
+            self.assertNotMsgId('Ignore', po_contents)
+        finally:
+            os.remove('./javascript.js')
 
+    def test_javascript_block_comments(self):
+        os.chdir(self.test_dir)
+        shutil.copyfile('./javascript/block_comments.txt', './javascript.js')
+        try:
+            management.call_command('makemessages', domain='djangojs', locale=LOCALE, verbosity=0)
+            self.assert_(os.path.exists(self.PO_FILE))
+            po_contents = open(self.PO_FILE, 'r').read()
+            self.assertMsgId('Line1', po_contents)
+            self.assertMsgId('Line6A', po_contents)
+            self.assertMsgId('Line6B', po_contents)
+            self.assertMsgId('Line8', po_contents)
+            self.assertMsgId('Line12', po_contents)
+            self.assertNotMsgId('Ignore', po_contents)
+            # check line number
+            self.assertMsgIdLineNumber('Line1', 1, po_contents)
+            self.assertMsgIdLineNumber('Line6A', 6, po_contents)
+            self.assertMsgIdLineNumber('Line6B', 6, po_contents)
+            self.assertMsgIdLineNumber('Line8', 8, po_contents)
+            self.assertMsgIdLineNumber('Line12', 12, po_contents)
+        finally:
+            os.remove('./javascript.js')
 
 class IgnoredExtractorTests(ExtractorTests):
 
