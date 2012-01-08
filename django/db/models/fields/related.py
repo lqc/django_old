@@ -249,7 +249,10 @@ class SingleRelatedObjectDescriptor(object):
         if instance is None:
             return self
         try:
-            return getattr(instance, self.cache_name)
+            value = getattr(instance, self.cache_name)
+            if value is None:
+                raise self.related.model.DoesNotExist
+            return value
         except AttributeError:
             params = {'%s__pk' % self.related.field.name: instance._get_pk_val()}
             rel_obj = self.get_query_set(instance=instance).get(**params)
