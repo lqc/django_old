@@ -389,7 +389,7 @@ class Fieldset(StrAndUnicode):
 
     def __getitem__(self, name):
         "Returns a BoundField with the given name."
-        if not name in self.fields:
+        if name not in self.fields:
             raise KeyError('Key %r not found in Fieldset' % name)
         return self.form[name]
 
@@ -501,10 +501,10 @@ class Fieldset(StrAndUnicode):
 
         If attrs are given, they're used as HTML attributes on the <legend> tag.
         """
-        if contents is None and not self.legend is None:
+        if contents is None and self.legend is not None:
             contents = conditional_escape(self.legend)
         attrs = attrs and flatatt(attrs) or ''
-        if not contents is None:
+        if contents is not None:
             return mark_safe(u'<legend%s>%s</legend>' % (attrs, force_unicode(self.legend)))
         return None
 
