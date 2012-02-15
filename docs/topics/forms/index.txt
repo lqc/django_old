@@ -388,6 +388,116 @@ tag::
 If you find yourself doing this often, you might consider creating a custom
 :ref:`inclusion tag<howto-custom-template-tags-inclusion-tags>`.
 
+Fieldsets
+---------
+
+.. versionadded:: development
+
+Having a complex form you may want to organize its fields in logical groups.
+In Django you can do that using fieldsets. Fieldsets allow you to iterate
+through their fields and are autmatically rendered by form using ``<fieldset>``
+HTML tag and its subtag ``<legend>``.
+
+
+Fieldsets are defined using ``Meta`` options class. If you're familiar
+with :attr:`~django.contrib.admin.ModelAdmin.fieldsets` from Django admin
+options, you alreadyknow the syntax:
+
+.. code-block:: python
+
+    class PersonForm(forms.Form):
+        home_phone = CharField()
+        cell_phone = CharField()
+        first_name = CharField()
+        last_name = CharField()
+
+        class Meta:
+            fieldsets = (
+                (None, {
+                    'fields': ('first_name', 'last_name',),
+                }),
+                ("Phone numbers", {
+                    'fields': ('cell_phone', 'home_phone',),
+                }),
+            )
+
+Having above example form you may render it in a template just like a normal form::
+
+    <form action="" method="post">
+        {{ form.as_table }}
+        <input type="submit" value="Send" />
+    </form>
+
+Except now instead of one ``<table>`` element, ``as_table`` method will
+print two tables wrapped up in ``<fieldset>`` tags::
+
+    <form action="" method="post">
+        <fieldset>
+            <table>
+                <tr>
+                    <th><label for="id_first_name">First name:</label></th>
+                    <td><input type="text" name="first_name" id="id_first_name" /></td>
+                </tr>
+                <tr>
+                    <th><label for="id_last_name">Last name:</label></th>
+                    <td><input type="text" name="last_name" id="id_last_name" /></td>
+                </tr>
+            </table>
+        </fieldset>
+        <fieldset>
+            <legend>Phone numbers</legend>
+            <table>
+                <tr>
+                    <th><label for="id_cell_phone">Cell phone:</label></th>
+                    <td><input type="text" name="cell_phone" id="id_cell_phone" /></td>
+                </tr>
+                <tr>
+                    <th><label for="id_home_phone">Home phone:</label></th>
+                    <td><input type="text" name="home_phone" id="id_home_phone" /></td>
+                </tr>
+            </table>
+        </fieldset>
+        <input type="submit" value="Send" />
+    </form>
+
+You can also customize your output looping through form's fieldsets and using
+their methods -- ``as_table``, ``as_ul`` and ``as_p`` -- which behave just like
+their equivalents from ``Form`` class and using a ``legend_tag`` method::
+
+    <form action="" method="post">
+        {% for fieldset in form.fieldsets %}
+            <fieldset>
+                {{ fieldset.legend_tag }}
+                <table>
+                    {{ fieldset.as_table }}
+                </table>
+            </fieldset>
+        {% endfor %}
+        <input type="submit" value="Send" />
+    </form>
+
+You can be even more specific and loop through all fields of all fieldsets::
+
+    <form action="" method="post">
+        {% for fieldset in form.fieldsets %}
+            <fieldset>
+                {{ fieldset.legend_tag }}
+                <ul>
+                    {% for field in fieldset %}
+                        <li>
+                            {{ field.label_tag }}
+                            {{ field }}
+                        </li>
+                    {% endfor %}
+                </ul>
+            </fieldset>
+        {% endfor %}
+        <input type="submit" value="Send" />
+    </form>
+
+You can also loop though fieldset ``hidden_fields`` and ``visible_fields`` just
+line in a form class.
+
 Further topics
 ==============
 

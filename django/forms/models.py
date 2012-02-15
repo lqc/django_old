@@ -8,11 +8,12 @@ from __future__ import absolute_import
 from django.core.exceptions import ValidationError, NON_FIELD_ERRORS, FieldError
 from django.core.validators import EMPTY_VALUES
 from django.forms.fields import Field, ChoiceField
-from django.forms.forms import BaseForm, get_declared_fields
+from django.forms.forms import (BaseForm, BaseFormOptions, BaseFormMetaclass,
+    get_declared_fields)
 from django.forms.formsets import BaseFormSet, formset_factory
 from django.forms.util import ErrorList
 from django.forms.widgets import (SelectMultiple, HiddenInput,
-    MultipleHiddenInput, media_property)
+    MultipleHiddenInput)
 from django.utils.encoding import smart_unicode, force_unicode
 from django.utils.datastructures import SortedDict
 from django.utils.text import get_text_list, capfirst
@@ -175,19 +176,19 @@ def fields_for_model(model, fields=None, exclude=None, widgets=None, formfield_c
         )
     return field_dict
 
-class ModelFormOptions(object):
+class ModelFormOptions(BaseFormOptions):
     def __init__(self, options=None):
+        super(ModelFormOptions, self).__init__(options)
         self.model = getattr(options, 'model', None)
         self.fields = getattr(options, 'fields', None)
         self.exclude = getattr(options, 'exclude', None)
         self.widgets = getattr(options, 'widgets', None)
 
-
-class ModelFormMetaclass(type):
+class ModelFormMetaclass(BaseFormMetaclass):
     def __new__(cls, name, bases, attrs):
         formfield_callback = attrs.pop('formfield_callback', None)
         try:
-            parents = [b for b in bases if issubclass(b, ModelForm)]
+            parents = [b for b in bases if issubclass(b, BaseModelForm)]
         except NameError:
             # We are defining ModelForm itself.
             parents = None
@@ -196,9 +197,10 @@ class ModelFormMetaclass(type):
                 attrs)
         if not parents:
             return new_class
-
-        if 'media' not in attrs:
-            new_class.media = media_property(new_class)
+        # Override BaseFormOptions with ModelFormOptions (which is actually
+        # BaseFormOptions' subclass). This obviously causes BaseFormOptions.__init__()
+        # being called twice through the form class definition, but it's a price we can
+        # pay for the less redundant code.
         opts = new_class._meta = ModelFormOptions(getattr(new_class, 'Meta', None))
         if opts.model:
             # If a model is defined, extract form fields from it.
@@ -305,7 +307,7 @@ class BaseModelForm(BaseForm):
 
     def _post_clean(self):
         opts = self._meta
-        # Update the model instance with self.cleaned_data.
+        # Update the model instance with self.cleaned_data.ModelForm
         self.instance = construct_instance(self, self.instance, opts.fields, opts.exclude)
 
         exclude = self._get_validation_exclusions()

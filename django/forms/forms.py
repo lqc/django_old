@@ -54,18 +54,33 @@ def get_declared_fields(bases, attrs, with_base_fields=True):
 
     return SortedDict(fields)
 
-class DeclarativeFieldsMetaclass(type):
-    """
-    Metaclass that converts Field attributes to a dictionary called
-    'base_fields', taking into account parent class 'base_fields' as well.
-    """
+class BaseFormOptions(object):
+    def __init__(self, options=None):
+        self.fieldsets = getattr(options, 'fieldsets', None)
+
+class BaseFormMetaclass(type):
     def __new__(cls, name, bases, attrs):
-        attrs['base_fields'] = get_declared_fields(bases, attrs)
-        new_class = super(DeclarativeFieldsMetaclass,
-                     cls).__new__(cls, name, bases, attrs)
+        try:
+            parents = [b for b in bases if issubclass(b, BaseForm)]
+        except NameError:
+            # We are defining Form itself.
+            parents = None
+        new_class = super(BaseFormMetaclass, cls).__new__(cls, name, bases, attrs)
+        if not parents:
+            return new_class
         if 'media' not in attrs:
             new_class.media = media_property(new_class)
+        new_class._meta = BaseFormOptions(getattr(new_class, 'Meta', None))
         return new_class
+
+class DeclarativeFieldsMetaclass(BaseFormMetaclass):
+     """
+     Metaclass that converts Field attributes to a dictionary called
+     'base_fields', taking into account parent class 'base_fields' as well.
+     """
+     def __new__(cls, name, bases, attrs):
+         attrs['base_fields'] = get_declared_fields(bases, attrs)
+         return super(DeclarativeFieldsMetaclass, cls).__new__(cls, name, bases, attrs)
 
 class BaseForm(StrAndUnicode):
     # This is the main implementation of all the Form logic. Note that this
@@ -138,104 +153,50 @@ class BaseForm(StrAndUnicode):
         """
         return u'initial-%s' % self.add_prefix(field_name)
 
-    def _html_output(self, normal_row, error_row, row_ender, help_text_html, errors_on_separate_row):
+    def _html_output(self, fieldset_method, error_row, before_fieldset=u'', after_fieldset=u''):
         "Helper function for outputting HTML. Used by as_table(), as_ul(), as_p()."
         top_errors = self.non_field_errors() # Errors that should be displayed above all fields.
-        output, hidden_fields = [], []
+        output = []
 
-        for name, field in self.fields.items():
-            html_class_attr = ''
-            bf = self[name]
-            bf_errors = self.error_class([conditional_escape(error) for error in bf.errors]) # Escape and cache in local variable.
-            if bf.is_hidden:
-                if bf_errors:
-                    top_errors.extend([u'(Hidden field %s) %s' % (name, force_unicode(e)) for e in bf_errors])
-                hidden_fields.append(unicode(bf))
-            else:
-                # Create a 'class="..."' atribute if the row should have any
-                # CSS classes applied.
-                css_classes = bf.css_classes()
-                if css_classes:
-                    html_class_attr = ' class="%s"' % css_classes
-
-                if errors_on_separate_row and bf_errors:
-                    output.append(error_row % force_unicode(bf_errors))
-
-                if bf.label:
-                    label = conditional_escape(force_unicode(bf.label))
-                    # Only add the suffix if the label does not end in
-                    # punctuation.
-                    if self.label_suffix:
-                        if label[-1] not in ':?.!':
-                            label += self.label_suffix
-                    label = bf.label_tag(label) or ''
-                else:
-                    label = ''
-
-                if field.help_text:
-                    help_text = help_text_html % force_unicode(field.help_text)
-                else:
-                    help_text = u''
-
-                output.append(normal_row % {
-                    'errors': force_unicode(bf_errors),
-                    'label': force_unicode(label),
-                    'field': unicode(bf),
-                    'help_text': help_text,
-                    'html_class_attr': html_class_attr
-                })
+        for fieldset in self.fieldsets:
+            fieldset_html = [getattr(fieldset, fieldset_method)()]
+            if not fieldset.dummy:
+                fieldset_html.insert(0, u'<fieldset>')
+                fieldset_html.insert(1, before_fieldset)
+                fieldset_html.append(after_fieldset)
+                fieldset_html.append(u'</fieldset>')
+                if fieldset.legend:
+                    fieldset_html.insert(1, fieldset.legend_tag())
+                if top_errors:
+                    output.insert(0, force_unicode(top_errors))
+            output.extend(fieldset_html)
 
         if top_errors:
             output.insert(0, error_row % force_unicode(top_errors))
 
-        if hidden_fields: # Insert any hidden fields in the last row.
-            str_hidden = u''.join(hidden_fields)
-            if output:
-                last_row = output[-1]
-                # Chop off the trailing row_ender (e.g. '</td></tr>') and
-                # insert the hidden fields.
-                if not last_row.endswith(row_ender):
-                    # This can happen in the as_p() case (and possibly others
-                    # that users write): if there are only top errors, we may
-                    # not be able to conscript the last row for our purposes,
-                    # so insert a new, empty row.
-                    last_row = (normal_row % {'errors': '', 'label': '',
-                                              'field': '', 'help_text':'',
-                                              'html_class_attr': html_class_attr})
-                    output.append(last_row)
-                output[-1] = last_row[:-len(row_ender)] + str_hidden + row_ender
-            else:
-                # If there aren't any rows in the output, just append the
-                # hidden fields.
-                output.append(str_hidden)
         return mark_safe(u'\n'.join(output))
 
     def as_table(self):
         "Returns this form rendered as HTML <tr>s -- excluding the <table></table>."
         return self._html_output(
-            normal_row = u'<tr%(html_class_attr)s><th>%(label)s</th><td>%(errors)s%(field)s%(help_text)s</td></tr>',
+            fieldset_method='as_table',
             error_row = u'<tr><td colspan="2">%s</td></tr>',
-            row_ender = u'</td></tr>',
-            help_text_html = u'<br /><span class="helptext">%s</span>',
-            errors_on_separate_row = False)
+            before_fieldset=u'<table>',
+            after_fieldset=u'</table>')
 
     def as_ul(self):
         "Returns this form rendered as HTML <li>s -- excluding the <ul></ul>."
         return self._html_output(
-            normal_row = u'<li%(html_class_attr)s>%(errors)s%(label)s %(field)s%(help_text)s</li>',
+            fieldset_method='as_ul',
             error_row = u'<li>%s</li>',
-            row_ender = '</li>',
-            help_text_html = u' <span class="helptext">%s</span>',
-            errors_on_separate_row = False)
+            before_fieldset=u'<ul>',
+            after_fieldset=u'</ul>')
 
     def as_p(self):
         "Returns this form rendered as HTML <p>s."
         return self._html_output(
-            normal_row = u'<p%(html_class_attr)s>%(label)s %(field)s%(help_text)s</p>',
-            error_row = u'%s',
-            row_ender = '</p>',
-            help_text_html = u' <span class="helptext">%s</span>',
-            errors_on_separate_row = True)
+            fieldset_method='as_p',
+            error_row = u'%s')
 
     def non_field_errors(self):
         """
@@ -380,6 +341,19 @@ class BaseForm(StrAndUnicode):
         """
         return [field for field in self if not field.is_hidden]
 
+    def _fieldsets(self):
+        """
+        Returns a list of Fieldset objects for each fieldset
+        defined in Form's Meta options. If no fieldsets were defined,
+        returns a list containing single, 'dummy' Fieldset with
+        all form fields.
+        """
+        if self._meta.fieldsets:
+            return [Fieldset(self, legend, attrs.get('fields', tuple()))
+                    for legend, attrs in self._meta.fieldsets]
+        return [Fieldset(self, None, self.fields.keys(), dummy=True)]
+    fieldsets = property(_fieldsets)
+
 class Form(BaseForm):
     "A collection of Fields, plus their associated data."
     # This is a separate class from BaseForm in order to abstract the way
@@ -388,6 +362,167 @@ class Form(BaseForm):
     # to define a form using declarative syntax.
     # BaseForm itself has no way of designating self.fields.
     __metaclass__ = DeclarativeFieldsMetaclass
+
+class Fieldset(StrAndUnicode):
+
+    def __init__(self, form, legend, fields, dummy=False):
+        """
+        Arguments:
+        form   -- form this fieldset belongs to
+        legend -- fieldset's legend (used in <legend> tag)
+        fields -- list containing names of fields in this fieldset
+
+        Keyword arguments:
+        dummy  -- flag informing that the fieldset was created automatically
+                  from all fields of form, because user has not defined
+                  custom fieldsets
+        """
+        self.form = form
+        self.legend = legend
+        self.fields = fields
+        self.dummy = dummy
+
+    def __unicode__(self):
+        return self.as_table()
+
+    def __iter__(self):
+        for name in self.fields:
+            yield BoundField(self.form, self.form.fields[name], name)
+
+    def __getitem__(self, name):
+        "Returns a BoundField with the given name."
+        if not name in self.fields:
+            raise KeyError('Key %r not found in Fieldset' % name)
+        return self.form[name]
+
+    def _html_output(self, normal_row, error_row, row_ender, help_text_html, errors_on_separate_row):
+        "Helper function for outputting HTML. Used by as_table(), as_ul(), as_p()."
+        output, hidden_fields = [], []
+        top_errors = self.form.error_class()
+
+        for name in self.fields:
+            field = self.form.fields[name]
+            html_class_attr = ''
+            bf = self.form[name]
+            bf_errors = self.form.error_class([conditional_escape(error) for error in bf.errors]) # Escape and cache in local variable.
+            if bf.is_hidden:
+                if bf_errors:
+                    top_errors.extend([u'(Hidden field %s) %s' % (name, force_unicode(e)) for e in bf_errors])
+                hidden_fields.append(unicode(bf))
+            else:
+                # Create a 'class="..."' atribute if the row should have any
+                # CSS classes applied.
+                css_classes = bf.css_classes()
+                if css_classes:
+                    html_class_attr = ' class="%s"' % css_classes
+
+                if errors_on_separate_row and bf_errors:
+                    output.append(error_row % force_unicode(bf_errors))
+
+                if bf.label:
+                    label = conditional_escape(force_unicode(bf.label))
+                    # Only add the suffix if the label does not end in
+                    # punctuation.
+                    if self.form.label_suffix:
+                        if label[-1] not in ':?.!':
+                            label += self.form.label_suffix
+                    label = bf.label_tag(label) or ''
+                else:
+                    label = ''
+
+                if field.help_text:
+                    help_text = help_text_html % force_unicode(field.help_text)
+                else:
+                    help_text = u''
+
+                output.append(normal_row % {
+                    'errors': force_unicode(bf_errors),
+                    'label': force_unicode(label),
+                    'field': unicode(bf),
+                    'help_text': help_text,
+                    'html_class_attr': html_class_attr
+                })
+
+        if top_errors:
+            output.insert(0, error_row % force_unicode(top_errors))
+
+        if hidden_fields: # Insert any hidden fields in the last row.
+            str_hidden = u''.join(hidden_fields)
+            if output:
+                last_row = output[-1]
+                # Chop off the trailing row_ender (e.g. '</td></tr>') and
+                # insert the hidden fields.
+                if not last_row.endswith(row_ender):
+                    # This can happen in the as_p() case (and possibly others
+                    # that users write): if there are only top errors, we may
+                    # not be able to conscript the last row for our purposes,
+                    # so insert a new, empty row.
+                    last_row = (normal_row % {'errors': '', 'label': '',
+                                              'field': '', 'help_text':'',
+                                              'html_class_attr': html_class_attr})
+                    output.append(last_row)
+                output[-1] = last_row[:-len(row_ender)] + str_hidden + row_ender
+            else:
+                # If there aren't any rows in the output, just append the
+                # hidden fields.
+                output.append(str_hidden)
+
+        return mark_safe(u'\n'.join(output))
+
+    def as_table(self):
+        "Returns this fieldset rendered as HTML <tr>s -- excluding the <table>, <fieldset> and <legend> tags."
+        return self._html_output(
+            normal_row = u'<tr%(html_class_attr)s><th>%(label)s</th><td>%(errors)s%(field)s%(help_text)s</td></tr>',
+            error_row = u'<tr><td colspan="2">%s</td></tr>',
+            row_ender = u'</td></tr>',
+            help_text_html = u'<br /><span class="helptext">%s</span>',
+            errors_on_separate_row = False)
+
+    def as_ul(self):
+        "Returns this fieldset rendered as HTML <li>s -- excluding the <ul>, <fieldset> and <legend> tags."
+        return self._html_output(
+            normal_row = u'<li%(html_class_attr)s>%(errors)s%(label)s %(field)s%(help_text)s</li>',
+            error_row = u'<li>%s</li>',
+            row_ender = '</li>',
+            help_text_html = u' <span class="helptext">%s</span>',
+            errors_on_separate_row = False)
+
+    def as_p(self):
+        "Returns this fieldset rendered as HTML <p>s -- excluding the <fieldset> and <legend> tags."
+        return self._html_output(
+            normal_row = u'<p%(html_class_attr)s>%(label)s %(field)s%(help_text)s</p>',
+            error_row = u'%s',
+            row_ender = '</p>',
+            help_text_html = u' <span class="helptext">%s</span>',
+            errors_on_separate_row = True)
+
+    def legend_tag(self, contents=None, attrs=None):
+        """
+        Wraps the given contents in a <legend>. Does not HTML-escape the contents.
+        If contents aren't given, uses the fieldset's HTML-escaped legend.
+
+        If attrs are given, they're used as HTML attributes on the <legend> tag.
+        """
+        if contents is None and not self.legend is None:
+            contents = conditional_escape(self.legend)
+        attrs = attrs and flatatt(attrs) or ''
+        if not contents is None:
+            return mark_safe(u'<legend%s>%s</legend>' % (attrs, force_unicode(self.legend)))
+        return None
+
+    def hidden_fields(self):
+        """
+        Returns a list of all the BoundField objects that are hidden fields.
+        Useful for manual form layout in templates.
+        """
+        return [field for field in self if field.is_hidden]
+
+    def visible_fields(self):
+        """
+        Returns a list of BoundField objects that aren't hidden fields.
+        The opposite of the hidden_fields() method.
+        """
+        return [field for field in self if not field.is_hidden]
 
 class BoundField(StrAndUnicode):
     "A Field plus data"

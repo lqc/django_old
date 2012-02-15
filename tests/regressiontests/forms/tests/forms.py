@@ -1807,3 +1807,48 @@ class FormsTestCase(TestCase):
         form = NameForm(data={'name' : ['fname', 'lname']})
         self.assertTrue(form.is_valid())
         self.assertEqual(form.cleaned_data, {'name' : 'fname lname'})
+
+    def test_meta_options(self):
+        class MetaOptionsForm(Form):
+            class Meta:
+                fieldsets = 0xDEADBEEF
+                some_nonexising_option = True
+        class MetaOptionsDerivantForm(MetaOptionsForm):
+            pass
+        # Test classes
+        self.assertEqual(MetaOptionsForm._meta.fieldsets, 0xDEADBEEF)
+        self.assertEqual(MetaOptionsDerivantForm._meta.fieldsets, 0xDEADBEEF)
+        self.assertFalse(hasattr(MetaOptionsForm._meta, 'some_nonexising_option'))
+        self.assertFalse(hasattr(MetaOptionsDerivantForm._meta, 'some_nonexising_option'))
+        # Test instances
+        meta_options_form = MetaOptionsForm()
+        meta_options_derivant_form = MetaOptionsDerivantForm()
+        self.assertEqual(meta_options_form._meta.fieldsets, 0xDEADBEEF)
+        self.assertEqual(meta_options_derivant_form._meta.fieldsets, 0xDEADBEEF)
+        self.assertFalse(hasattr(meta_options_form._meta, 'some_nonexising_option'))
+        self.assertFalse(hasattr(meta_options_derivant_form._meta, 'some_nonexising_option'))
+
+    def test_meta_options_override(self):
+        class MetaOptionsForm(Form):
+            class Meta:
+                fieldsets = 0xDEADBEEF
+        class MetaOptionsDerivantForm(MetaOptionsForm):
+            class Meta:
+                fieldsets = 0xCAFEBABE
+        # Test classes
+        self.assertEqual(MetaOptionsForm._meta.fieldsets, 0xDEADBEEF)
+        self.assertEqual(MetaOptionsDerivantForm._meta.fieldsets, 0xCAFEBABE)
+        # Test instances
+        meta_options_form = MetaOptionsForm()
+        meta_options_derivant_form = MetaOptionsDerivantForm()
+        self.assertEqual(meta_options_form._meta.fieldsets, 0xDEADBEEF)
+        self.assertEqual(meta_options_derivant_form._meta.fieldsets, 0xCAFEBABE)
+
+    def test_meta_option_defaults(self):
+        class MetaOptionsForm(Form):
+            pass
+        # Test classes
+        self.assertIsNone(MetaOptionsForm._meta.fieldsets)
+        # Test instance
+        meta_options_form = MetaOptionsForm()
+        self.assertIsNone(meta_options_form._meta.fieldsets)

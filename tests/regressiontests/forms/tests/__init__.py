@@ -19,3 +19,4 @@ from .util import FormsUtilTestCase
 from .validators import TestFieldWithValidators
 from .widgets import (FormsWidgetTestCase, FormsI18NWidgetsTestCase,
     WidgetTests, ClearableFileInputTests)
+from .fieldsets import FieldsetsTestCase
