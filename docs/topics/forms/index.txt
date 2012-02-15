@@ -391,17 +391,17 @@ If you find yourself doing this often, you might consider creating a custom
 Fieldsets
 ---------
 
-.. versionadded:: development
+.. versionadded:: 1.4
 
 Having a complex form you may want to organize its fields in logical groups.
 In Django you can do that using fieldsets. Fieldsets allow you to iterate
-through their fields and are autmatically rendered by form using ``<fieldset>``
+through their fields and are automatically rendered by form using ``<fieldset>``
 HTML tag and its subtag ``<legend>``.
 
 
 Fieldsets are defined using ``Meta`` options class. If you're familiar
 with :attr:`~django.contrib.admin.ModelAdmin.fieldsets` from Django admin
-options, you alreadyknow the syntax:
+options, you already know the syntax:
 
 .. code-block:: python
 
@@ -461,7 +461,7 @@ print two tables wrapped up in ``<fieldset>`` tags::
     </form>
 
 You can also customize your output looping through form's fieldsets and using
-their methods -- ``as_table``, ``as_ul`` and ``as_p`` -- which behave just like
+their methods --- ``as_table``, ``as_ul`` and ``as_p`` --- which behave just like
 their equivalents from ``Form`` class and using a ``legend_tag`` method::
 
     <form action="" method="post">
