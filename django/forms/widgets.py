@@ -70,7 +70,7 @@ class Media(StrAndUnicode):
             return path
         if prefix is None:
             if settings.STATIC_URL is None:
-                 # backwards compatibility
+                # backwards compatibility
                 prefix = settings.MEDIA_URL
             else:
                 prefix = settings.STATIC_URL

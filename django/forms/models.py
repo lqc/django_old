@@ -185,23 +185,17 @@ class ModelFormOptions(BaseFormOptions):
         self.widgets = getattr(options, 'widgets', None)
 
 class ModelFormMetaclass(BaseFormMetaclass):
+
     def __new__(cls, name, bases, attrs):
         formfield_callback = attrs.pop('formfield_callback', None)
-        try:
-            parents = [b for b in bases if issubclass(b, BaseModelForm)]
-        except NameError:
-            # We are defining ModelForm itself.
-            parents = None
-        declared_fields = get_declared_fields(bases, attrs, False)
-        new_class = super(ModelFormMetaclass, cls).__new__(cls, name, bases,
-                attrs)
-        if not parents:
+
+        new_class = super(ModelFormMetaclass, cls).__new__(cls, name, bases, attrs)
+        opts = getattr(new_class, "_meta", None)
+        if not opts:  # no parents
             return new_class
-        # Override BaseFormOptions with ModelFormOptions (which is actually
-        # BaseFormOptions' subclass). This obviously causes BaseFormOptions.__init__()
-        # being called twice through the form class definition, but it's a price we can
-        # pay for the less redundant code.
-        opts = new_class._meta = ModelFormOptions(getattr(new_class, 'Meta', None))
+        
+        declared_fields = get_declared_fields(bases, attrs, False)
+
         if opts.model:
             # If a model is defined, extract form fields from it.
             fields = fields_for_model(opts.model, opts.fields,
@@ -223,6 +217,11 @@ class ModelFormMetaclass(BaseFormMetaclass):
         new_class.declared_fields = declared_fields
         new_class.base_fields = fields
         return new_class
+
+    @classmethod
+    def make_options(cls, meta):
+        return ModelFormOptions(meta)
+
 
 class BaseModelForm(BaseForm):
     def __init__(self, data=None, files=None, auto_id='id_%s', prefix=None,
