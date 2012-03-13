@@ -520,7 +520,7 @@ class SerializationTests(BaseDateTimeTests):
         self.assertEqual(obj.dt, dt)
 
         data = serializers.serialize('xml', [Event(dt=dt)])
-        self.assertIn('<field type="DateTimeField" name="dt">2011-09-01T13:20:30</field>', data)
+        self.assertXMLEqual('<?xml version="1.0" encoding="utf-8"?>\n<django-objects version="1.0"><object model="timezones.event"><field name="dt" type="DateTimeField">2011-09-01T13:20:30</field></object></django-objects>', data)
         obj = serializers.deserialize('xml', data).next().object
         self.assertEqual(obj.dt, dt)
 
@@ -544,7 +544,7 @@ class SerializationTests(BaseDateTimeTests):
         self.assertEqual(obj.dt, dt.replace(microsecond=405000))
 
         data = serializers.serialize('xml', [Event(dt=dt)])
-        self.assertIn('<field type="DateTimeField" name="dt">2011-09-01T13:20:30.405060</field>', data)
+        self.assertXMLEqual('<?xml version="1.0" encoding="utf-8"?>\n<django-objects version="1.0"><object model="timezones.event"><field name="dt" type="DateTimeField">2011-09-01T13:20:30.405060</field></object></django-objects>', data)
         obj = serializers.deserialize('xml', data).next().object
         self.assertEqual(obj.dt, dt)
 
@@ -568,7 +568,7 @@ class SerializationTests(BaseDateTimeTests):
         self.assertEqual(obj.dt, dt.replace(microsecond=405000))
 
         data = serializers.serialize('xml', [Event(dt=dt)])
-        self.assertIn('<field type="DateTimeField" name="dt">2011-09-01T17:20:30.405060+07:00</field>', data)
+        self.assertIn('<?xml version="1.0" encoding="utf-8"?>\n<django-objects version="1.0"><object model="timezones.event"><field name="dt" type="DateTimeField">2011-09-01T17:20:30.405060+07:00</field></object></django-objects>', data)
         obj = serializers.deserialize('xml', data).next().object
         self.assertEqual(obj.dt, dt)
 
@@ -592,7 +592,7 @@ class SerializationTests(BaseDateTimeTests):
         self.assertEqual(obj.dt, dt)
 
         data = serializers.serialize('xml', [Event(dt=dt)])
-        self.assertIn('<field type="DateTimeField" name="dt">2011-09-01T10:20:30+00:00</field>', data)
+        self.assertXMLEqual('<?xml version="1.0" encoding="utf-8"?>\n<django-objects version="1.0"><object model="timezones.event"><field name="dt" type="DateTimeField">2011-09-01T10:20:30+00:00</field></object></django-objects>', data)
         obj = serializers.deserialize('xml', data).next().object
         self.assertEqual(obj.dt, dt)
 
@@ -616,7 +616,7 @@ class SerializationTests(BaseDateTimeTests):
         self.assertEqual(obj.dt, dt)
 
         data = serializers.serialize('xml', [Event(dt=dt)])
-        self.assertIn('<field type="DateTimeField" name="dt">2011-09-01T13:20:30+03:00</field>', data)
+        self.assertXMLEqual('<?xml version="1.0" encoding="utf-8"?><django-objects version="1.0"><object model="timezones.event"><field name="dt" type="DateTimeField">2011-09-01T13:20:30+03:00</field></object></django-objects>', data)
         obj = serializers.deserialize('xml', data).next().object
         self.assertEqual(obj.dt, dt)
 
@@ -640,7 +640,7 @@ class SerializationTests(BaseDateTimeTests):
         self.assertEqual(obj.dt, dt)
 
         data = serializers.serialize('xml', [Event(dt=dt)])
-        self.assertIn('<field type="DateTimeField" name="dt">2011-09-01T17:20:30+07:00</field>', data)
+        self.assertXMLEqual('<?xml version="1.0" encoding="utf-8"?>\n<django-objects version="1.0"><object model="timezones.event"><field name="dt" type="DateTimeField">2011-09-01T17:20:30+07:00</field></object></django-objects>', data)
         obj = serializers.deserialize('xml', data).next().object
         self.assertEqual(obj.dt, dt)
 
