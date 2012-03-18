@@ -1,6 +1,8 @@
 import datetime
 
 from django.utils import feedgenerator, tzinfo, unittest
+from xml.etree import ElementTree as ET
+from StringIO import StringIO
 
 class FeedgeneratorTest(unittest.TestCase):
     """
@@ -102,10 +104,15 @@ class FeedgeneratorTest(unittest.TestCase):
         feed = feedgenerator.Rss201rev2Feed('title', '/link/', 'descr')
         self.assertEquals(feed.feed['feed_url'], None)
         feed_content = feed.writeString('utf-8')
-        self.assertNotIn('<atom:link', feed_content)
+
+        links = ET.parse(StringIO(feed_content)).getiterator("{http://www.w3.org/2005/Atom}link")
+        self.assertEqual(len(links), 0, "Atom link found, but should have been omitted")
 
     def test_feed_with_feed_url_gets_rendered_with_atom_link(self):
         feed = feedgenerator.Rss201rev2Feed('title', '/link/', 'descr', feed_url='/feed/')
         self.assertEquals(feed.feed['feed_url'], '/feed/')
         feed_content = feed.writeString('utf-8')
-        self.assertIn('<atom:link', feed_content)
+
+        links = ET.parse(StringIO(feed_content)).getiterator("{http://www.w3.org/2005/Atom}link")
+        self.assertNotEqual(len(links), 0, "Atom link missing.")
+        self.assertEqual(links[0].attrib["href"], "/feed/")
