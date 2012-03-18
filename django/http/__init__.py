@@ -120,6 +120,7 @@ from django.http.multipartparser import MultiPartParser
 from django.http.utils import *
 from django.utils.datastructures import MultiValueDict, ImmutableList
 from django.utils.encoding import smart_str, iri_to_uri, force_unicode
+from django.utils.functional import first_getter
 from django.utils.http import cookie_date
 from django.utils import timezone
 
@@ -530,7 +531,7 @@ class QueryDict(MultiValueDict):
             encode = lambda k, v: '%s=%s' % ((quote(k, safe), quote(v, safe)))
         else:
             encode = lambda k, v: urlencode({k: v})
-        for k, list_ in self.lists():
+        for k, list_ in sorted(self.lists(), key=first_getter):
             k = smart_str(k, self.encoding)
             output.extend([encode(k, smart_str(v, self.encoding))
                            for v in list_])

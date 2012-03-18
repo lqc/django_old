@@ -298,6 +298,7 @@ class lazy_property(property):
                 return getattr(instance, name)()
         return property(fget, fset, fdel, doc)
 
+
 def partition(predicate, values):
     """
     Splits the values into two sets, based on the return value of the function
@@ -310,3 +311,6 @@ def partition(predicate, values):
     for item in values:
         results[predicate(item)].append(item)
     return results
+
+
+first_getter = operator.itemgetter(0)
